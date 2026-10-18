@@ -44,7 +44,7 @@ function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTim
 
 /* ---------- storage: local cache + cloud sync ---------- */
 // E: id -> {k:"f"|"s", r:record, u:updatedMs, x:deleted}
-const APP_VERSION="1.14.0";
+const APP_VERSION="1.14.1";
 let E=ls.get("lb_entries",{})||{};
 let outbox=new Set(ls.get("lb_outbox",[]));
 const live=k=>Object.values(E).filter(e=>e.k===k&&!e.x).map(e=>e.r);
@@ -58,6 +58,7 @@ function putRec(kind,rec){E[rec.id]={k:kind,r:rec,u:Date.now()};outbox.add(rec.i
 function removeRec(kind,id){if(!E[id])return;E[id]={...E[id],x:1,u:Date.now()};outbox.add(id);persist();render();soonSync()}
 function bulkPut(list){const t=Date.now();list.forEach(([k,r],i)=>{E[r.id]={k,r,u:t+i};outbox.add(r.id)});const ok=persist();render();soonSync(200);return ok}
 
+const _cc=ls.get("lb_cloud",null);if(_cc&&_cc.url&&/\/(rest|auth)\/v1/i.test(_cc.url)){_cc.url=_cc.url.replace(/\/(rest|auth)\/v1.*$/i,"").replace(/\/+$/,"");ls.set("lb_cloud",_cc)}
 const cloud={sb:null,user:null,cfg:ls.get("lb_cloud",null),syncing:false,last:ls.get("lb_lastsync",null),err:""};
 function setSync(){
   const el=$("#sync");let cls="local",t="Solo este dispositivo";
@@ -545,7 +546,7 @@ function renderCloud(){
       <div class="f"><label for="cUrl">Project URL</label><input id="cUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" inputmode="url"></div>
       <div class="f"><label for="cKey">anon public key</label><input id="cKey" placeholder="eyJhbGciOi…" autocomplete="off"></div>
       <div class="row"><button class="btn pri" id="cSave">Guardar</button><span class="note" id="cMsg"></span></div>`;
-    $("#cSave").onclick=()=>{const url=$("#cUrl").value.trim().replace(/\/+$/,""),key=$("#cKey").value.trim();
+    $("#cSave").onclick=()=>{const url=$("#cUrl").value.trim().replace(/\/(rest|auth)\/v1.*$/i,"").replace(/\/+$/,""),key=$("#cKey").value.trim();
       if(!/^https:\/\/.+/.test(url)||key.length<30){$("#cMsg").textContent="Revisa la URL (empieza por https://) y la clave anon.";return}
       cloud.cfg={url,key};ls.set("lb_cloud",cloud.cfg);connectCloud()};
     return;
