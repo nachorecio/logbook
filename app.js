@@ -44,9 +44,16 @@ function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTim
 
 /* ---------- storage: local cache + cloud sync ---------- */
 // E: id -> {k:"f"|"s", r:record, u:updatedMs, x:deleted}
-const APP_VERSION="1.15.0";
+const APP_VERSION="1.15.1";
 let E=ls.get("lb_entries",{})||{};
 let outbox=new Set(ls.get("lb_outbox",[]));
+/* ajustes personales que viajan con la nube (nombre, licencia, configuración): registro x/cfg */
+const SYNC_KEYS=["lb_owner","lb_simcfg","lb_ftrep","lb_goal","lb_prefs"];
+function cfgCollect(){const v={};SYNC_KEYS.forEach(k=>{const x=localStorage.getItem(k);if(x!=null)try{v[k]=JSON.parse(x)}catch{}});return v}
+function cfgApply(){const r=E.cfg;if(!r||r.x||!r.r?.vals)return;Object.entries(r.r.vals).forEach(([k,v])=>{if(SYNC_KEYS.includes(k))try{localStorage.setItem(k,JSON.stringify(v))}catch{}})}
+function cfgPush(){E.cfg={k:"x",r:{id:"cfg",d:"",vals:cfgCollect()},u:Date.now()};outbox.add("cfg");persist();if(typeof soonSync==="function")soonSync()}
+{const _set=ls.set;ls.set=(k,v)=>{const before=localStorage.getItem(k);_set(k,v);if(SYNC_KEYS.includes(k)&&localStorage.getItem(k)!==before)cfgPush()}}
+if(E.cfg)cfgApply();else if(Object.keys(cfgCollect()).length)setTimeout(cfgPush,0);
 const live=k=>Object.values(E).filter(e=>e.k===k&&!e.x).map(e=>e.r);
 const allF=()=>live("f").sort((a,b)=>(a.d+(a.dt||"")).localeCompare(b.d+(b.dt||"")));
 const allS=()=>live("s").sort((a,b)=>a.d.localeCompare(b.d));
@@ -101,7 +108,7 @@ async function sync(){
       if(data.length){const l=data[data.length-1];cur={t:l.updated_at,id:l.id};ls.set("lb_pull",cur)}
       if(data.length<1000)break;
     }
-    if(changed){persist();render()}
+    if(changed){persist();cfgApply();render();try{renderCover();renderOwner()}catch{}}
     cloud.last=new Date().toISOString();ls.set("lb_lastsync",cloud.last);
   }catch(e){cloud.err=e?.message||String(e);console.warn("sync",e)}
   cloud.syncing=false;setSync();renderCloud();
