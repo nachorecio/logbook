@@ -44,7 +44,7 @@ function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTim
 
 /* ---------- storage: local cache + cloud sync ---------- */
 // E: id -> {k:"f"|"s", r:record, u:updatedMs, x:deleted}
-const APP_VERSION="1.15.1";
+const APP_VERSION="1.15.2";
 let E=ls.get("lb_entries",{})||{};
 let outbox=new Set(ls.get("lb_outbox",[]));
 /* ajustes personales que viajan con la nube (nombre, licencia, configuración): registro x/cfg */
@@ -2393,7 +2393,7 @@ $("#verNote").textContent="Versión "+APP_VERSION+" · funciona sin conexión; l
 $("#file").setAttribute("accept",".xlsx,.xls,.csv,.pdf,.json");
 const _render=render;render=function(){CUST=null;_render();setSync();renderCur();renderApts();renderPlanned();renderSig();renderCover();renderStats();renderReport()};
 go(ls.get("lb_view","sum"));
-applySkin(ls.get("lb_skin","libro"),ls.get("lb_mode","auto"));applyFlMode(ls.get("lb_flmode","table"));renderLook();
+try{localStorage.setItem("lb_skin",JSON.stringify("libro"))}catch{}applySkin("libro",ls.get("lb_mode","auto"));applyFlMode(ls.get("lb_flmode","table"));renderLook();
 $("#repMin").value=REPORT_MIN();$("#repMinSave").onclick=()=>{ls.set("lb_report",Math.max(0,+$("#repMin").value||60));toast("Guardado");renderStats()};
 renderSimCfg();
 render();renderAiKey();renderOwner();renderOpen();renderGoal();connectCloud();
