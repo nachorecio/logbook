@@ -31,7 +31,14 @@
       <button data-v="st"><svg viewBox="0 0 24 24"><path d="M4 20v-7M10 20V5M16 20v-10M22 20H2"/></svg><span><span class="lg">Estadísticas</span><span class="sh">Stats</span></span></button>
       <button data-v="imp"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v3h16v-3"/></svg><span><span class="lg">Importar</span><span class="sh">Import</span></span></button>
       <button data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span>Ajustes</span></button>
+      <button class="more-btn" id="moreBtn" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg><span>Más</span></button>
     </nav>
+    <div class="more-sheet" id="moreSheet" hidden><div class="more-in">
+      <button data-go="fat"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Fatiga</button>
+      <button data-go="st"><svg viewBox="0 0 24 24"><path d="M4 20v-7M10 20V5M16 20v-10M22 20H2"/></svg>Estadísticas</button>
+      <button data-go="imp"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v3h16v-3"/></svg>Importar</button>
+      <button data-go="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>Ajustes</button>
+    </div></div>
     <button class="sync local" id="sync" style="background:none;border:0;color:inherit;cursor:pointer"><i></i>Solo este dispositivo</button>
   </div>
 </header>
@@ -39,6 +46,8 @@
 <main class="gut">
   <button class="livebar" id="liveBar" hidden></button>
   <div class="banner" id="bkBanner" hidden><span></span><button class="btn" data-backup>Hacer copia</button></div>
+  <div class="banner" id="updBanner" hidden><span>Hay una versión nueva de la app.</span><button class="btn" id="updBtn">Actualizar ahora</button></div>
+  <div class="banner alert" id="pauseBanner" hidden><span>No consigo conectar con tu base de datos en Supabase. Si llevas tiempo sin abrir la app, el proyecto gratuito puede estar en pausa: entra en Supabase y pulsa <b>Restore project</b>. Mientras tanto todo se guarda aquí y se subirá solo al reconectar.</span><a class="btn" id="pauseLink" target="_blank" rel="noopener">Abrir Supabase</a></div>
   <div class="banner" id="cloudBanner" hidden><span>Tus datos solo están en este dispositivo. Conecta la nube para verlos también en el móvil y el ordenador.</span><button class="btn" data-go="set">Conectar</button></div>
   <!-- RESUMEN -->
   <section class="view" id="v-sum">
@@ -60,7 +69,7 @@
     </div>
     <div class="three">
       <div class="panel">
-        <div class="row"><h3>Caducidades</h3><span class="spacer"></span><button class="btn sm" id="curIcs">Al calendario</button><button class="btn sm" id="curOpen">Gestionar</button></div>
+        <div class="row"><h3>Caducidades</h3><span class="spacer"></span><button class="btn sm" id="aesaQuick">Informe AESA/ATO</button><button class="btn sm" id="curIcs">Al calendario</button><button class="btn sm" id="curOpen">Gestionar</button></div>
         <div id="curList" class="curlist"></div>
       </div>
       <div class="panel">
@@ -252,7 +261,7 @@
     <div class="toolbar" style="margin-top:12px">
       <h2>Informes</h2>
       <div class="seg" id="repTypes" role="group" aria-label="Tipo de informe">
-        <button data-r="easa">Libro EASA</button><button data-r="period">Horas del periodo</button><button data-r="cv">Experiencia (CV)</button><button data-r="cert">Certificado</button><button data-r="ftl">Control FTL</button><button data-r="sim">Simulador</button>
+        <button data-r="easa">Libro EASA</button><button data-r="period">Horas del periodo</button><button data-r="cv">Experiencia (CV)</button><button data-r="cert">Certificado</button><button data-r="aesa">AESA / ATO</button><button data-r="ftl">Control FTL</button><button data-r="sim">Simulador</button>
       </div>
       <span class="spacer"></span>
       <label class="chk" id="easaOnlyWrap" hidden><input type="checkbox" id="easaOnly"> Solo páginas cerradas</label>
@@ -316,6 +325,11 @@
       <div class="row"><div class="seg" id="modePick" role="group" aria-label="Modo"><button data-mode="auto">Automático</button><button data-mode="light">Claro</button><button data-mode="dark">Oscuro</button></div><span class="note" id="modeNote" hidden>El tema Cabina es siempre oscuro.</span></div>
     </div>
     <div class="panel set" id="cloudPanel"></div>
+    <div class="panel set" id="feedPanel">
+      <h3>Avisos en el calendario</h3>
+      <p class="note">Un calendario suscrito en logbook.pitulines.com con tus caducidades, un aviso de "renovar" con la antelación que pongas en cada una y el último día de experiencia reciente. Se actualiza solo: lo que cambies aquí aparece en el calendario del móvil, del ordenador o de Pitulines en unas horas.</p>
+      <div id="feedBody"></div>
+    </div>
     <div class="panel set">
       <h3>Titular del libro</h3>
       <p class="note">Aparece en la cabecera de los informes.</p>
@@ -439,7 +453,7 @@
     <p class="msg w" id="flLock" hidden></p>
     <p class="calc" id="flCalc"></p>
     <div class="confirm" id="flConfirm" hidden><span>¿Borrar este vuelo del libro?</span><button type="button" class="btn danger" id="flDelYes">Borrar</button><button type="button" class="btn" id="flDelNo">Cancelar</button></div>
-    <div class="row"><button type="button" class="btn danger" id="flDel" hidden>Borrar</button><button type="button" class="btn" id="flCard" hidden>Tarjeta del vuelo</button><span class="spacer"></span><button type="submit" class="btn pri">Guardar</button></div>
+    <div class="row"><button type="button" class="btn danger" id="flDel" hidden>Borrar</button><button type="button" class="btn" id="flCard" hidden>Tarjeta del vuelo</button><button type="button" class="btn" id="flRet" hidden>↩ Repetir vuelta</button><span class="spacer"></span><button type="submit" class="btn pri">Guardar</button></div>
   </form>
 </div>
 

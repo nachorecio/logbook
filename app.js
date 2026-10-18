@@ -44,23 +44,38 @@ function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTim
 
 /* ---------- storage: local cache + cloud sync ---------- */
 // E: id -> {k:"f"|"s", r:record, u:updatedMs, x:deleted}
-const APP_VERSION="1.15.4";
-let E=ls.get("lb_entries",{})||{};
-let outbox=new Set(ls.get("lb_outbox",[]));
+const APP_VERSION="1.16.0";
+let E={};
+let outbox=new Set();
+/* almacenamiento local: IndexedDB (cientos de MB) con respaldo en localStorage (5 MB) */
+const IDB=(()=>{let dbp=null;const open=()=>dbp||(dbp=new Promise((ok,ko)=>{const r=indexedDB.open("pilot-logbook",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)}));
+  const tx=(mode,fn)=>open().then(db=>new Promise((ok,ko)=>{const t=db.transaction("kv",mode),req=fn(t.objectStore("kv"));t.oncomplete=()=>ok(req&&req.result);t.onerror=t.onabort=()=>ko(t.error)}));
+  return {get:k=>tx("readonly",s=>s.get(k)),set:(k,v)=>tx("readwrite",s=>s.put(v,k))}})();
+let useIDB=typeof indexedDB!=="undefined",pTimer=null,pBusy=false,pAgain=false;
+async function loadStore(){
+  if(useIDB){try{
+    const v=await IDB.get("store");
+    if(v&&v.E){E=v.E;outbox=new Set(v.o||[])}
+    else{const le=ls.get("lb_entries",null);if(le){E=le;outbox=new Set(ls.get("lb_outbox",[]));await IDB.set("store",{E,o:[...outbox]});try{localStorage.removeItem("lb_entries");localStorage.removeItem("lb_outbox")}catch{}}}
+    try{navigator.storage?.persist?.()}catch{}
+    return}catch(e){console.warn("IndexedDB no disponible",e);useIDB=false}}
+  E=ls.get("lb_entries",{})||{};outbox=new Set(ls.get("lb_outbox",[]));
+}
+function persistLS(){try{localStorage.setItem("lb_entries",JSON.stringify(E));localStorage.setItem("lb_outbox",JSON.stringify([...outbox]));return true}catch{toast("El almacenamiento del navegador está lleno.");return false}}
+async function flushStore(){if(!useIDB)return;if(pBusy){pAgain=true;return}pBusy=true;clearTimeout(pTimer);
+  try{await IDB.set("store",{E,o:[...outbox]})}catch(e){console.warn(e);useIDB=false;persistLS()}
+  pBusy=false;if(pAgain){pAgain=false;flushStore()}}
+addEventListener("pagehide",()=>flushStore());document.addEventListener("visibilitychange",()=>{if(document.hidden)flushStore()});
 /* ajustes personales que viajan con la nube (nombre, licencia, configuración): registro x/cfg */
 const SYNC_KEYS=["lb_owner","lb_simcfg","lb_ftrep","lb_goal","lb_prefs"];
 function cfgCollect(){const v={};SYNC_KEYS.forEach(k=>{const x=localStorage.getItem(k);if(x!=null)try{v[k]=JSON.parse(x)}catch{}});return v}
 function cfgApply(){const r=E.cfg;if(!r||r.x||!r.r?.vals)return;Object.entries(r.r.vals).forEach(([k,v])=>{if(SYNC_KEYS.includes(k))try{localStorage.setItem(k,JSON.stringify(v))}catch{}})}
 function cfgPush(){E.cfg={k:"x",r:{id:"cfg",d:"",vals:cfgCollect()},u:Date.now()};outbox.add("cfg");persist();if(typeof soonSync==="function")soonSync()}
 {const _set=ls.set;ls.set=(k,v)=>{const before=localStorage.getItem(k);_set(k,v);if(SYNC_KEYS.includes(k)&&localStorage.getItem(k)!==before)cfgPush()}}
-if(E.cfg)cfgApply();else if(Object.keys(cfgCollect()).length)setTimeout(cfgPush,0);
 const live=k=>Object.values(E).filter(e=>e.k===k&&!e.x).map(e=>e.r);
 const allF=()=>live("f").sort((a,b)=>(a.d+(a.dt||"")).localeCompare(b.d+(b.dt||"")));
 const allS=()=>live("s").sort((a,b)=>a.d.localeCompare(b.d));
-function persist(){
-  try{localStorage.setItem("lb_entries",JSON.stringify(E));localStorage.setItem("lb_outbox",JSON.stringify([...outbox]));return true}
-  catch{toast("El almacenamiento del navegador está lleno.");return false}
-}
+function persist(){if(!useIDB)return persistLS();clearTimeout(pTimer);pTimer=setTimeout(flushStore,60);return true}
 function putRec(kind,rec){E[rec.id]={k:kind,r:rec,u:Date.now()};outbox.add(rec.id);persist();render();soonSync()}
 function removeRec(kind,id){if(!E[id])return;E[id]={...E[id],x:1,u:Date.now()};outbox.add(id);persist();render();soonSync()}
 function bulkPut(list){const t=Date.now();list.forEach(([k,r],i)=>{E[r.id]={k,r,u:t+i};outbox.add(r.id)});const ok=persist();render();soonSync(200);return ok}
@@ -78,6 +93,8 @@ function setSync(){
   el.className="sync"+(cls?" "+cls:"");el.innerHTML="<i></i>"+esc(t);
   $("#cloudBanner").hidden=!!cloud.user||!(allF().length||allS().length);
 }
+function renderPause(){const b=$("#pauseBanner");if(!b)return;const on=!!cloud.user&&(cloud.fails||0)>=2;b.hidden=!on;
+  if(on){const ref=(cloud.cfg?.url||"").match(/https:\/\/([a-z0-9]+)\.supabase\.co/i)?.[1];$("#pauseLink").href=ref?`https://supabase.com/dashboard/project/${ref}`:"https://supabase.com/dashboard/projects"}}
 let syncT=null;
 function soonSync(ms=1500){clearTimeout(syncT);setSync();syncT=setTimeout(sync,ms)}
 async function sync(){
@@ -110,8 +127,9 @@ async function sync(){
     }
     if(changed){persist();cfgApply();render();try{renderCover();renderOwner()}catch{}}
     cloud.last=new Date().toISOString();ls.set("lb_lastsync",cloud.last);
-  }catch(e){cloud.err=e?.message||String(e);console.warn("sync",e)}
-  cloud.syncing=false;setSync();renderCloud();
+    cloud.fails=0;
+  }catch(e){cloud.err=e?.message||String(e);console.warn("sync",e);if(navigator.onLine)cloud.fails=(cloud.fails||0)+1}
+  cloud.syncing=false;setSync();renderCloud();renderPause();
 }
 async function connectCloud(){
   cloud.sb=null;cloud.user=null;
@@ -221,9 +239,12 @@ function render(){try{renderBackup()}catch{};renderSummary();renderLog();renderS
 
 /* ---------- navigation ---------- */
 let view="sum";
-function go(v){view=v;$$("#tabs button").forEach(b=>{if(b.dataset.v===v)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
-  $$("section.view").forEach(s=>s.hidden=s.id!=="v-"+v);$("#fab").hidden=v==="imp"||v==="set";$("#fab").setAttribute("aria-label",v==="sim"?"Añadir sesión":"Añadir vuelo");ls.set("lb_view",v);window.scrollTo(0,0);if(v==="st"){renderStats();renderReport()}if(v==="sum")renderCover();if(v==="map")renderBigMap();if(v==="fat")renderFatigue()}
-$("#tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b)go(b.dataset.v)});
+function go(v){view=v;$$("#tabs button").forEach(b=>{if(b.dataset.v===v||(b.id==="moreBtn"&&MORE_V.includes(v)))b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
+  $$("section.view").forEach(s=>s.hidden=s.id!=="v-"+v);$("#fab").hidden=v==="imp"||v==="set";$("#fab").setAttribute("aria-label",v==="sim"?"Añadir sesión":"Añadir vuelo");ls.set("lb_view",v);window.scrollTo(0,0);if(v==="st"){renderStats();renderReport()}if(v==="sum")renderCover();if(v==="map")renderBigMap();if(v==="fat")renderFatigue();if(v==="set")try{renderFeed()}catch{}}
+const MORE_V=["fat","st","imp","set"];
+function moreOpen(on){$("#moreSheet").hidden=!on;$("#moreBtn").setAttribute("aria-expanded",on?"true":"false")}
+$("#tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;if(b.id==="moreBtn"){moreOpen($("#moreSheet").hidden);return}moreOpen(false);go(b.dataset.v)});
+$("#moreSheet").addEventListener("click",e=>{if(e.target.closest("[data-go]")||e.target===e.currentTarget)moreOpen(false)});
 document.addEventListener("click",e=>{const g=e.target.closest("[data-go]");if(g)go(g.dataset.go)});
 $("#q").addEventListener("input",()=>{page=null;renderLog()});
 $("#yr").addEventListener("change",()=>{page=null;renderLog()});
@@ -242,11 +263,18 @@ function openFl(f,pre){
   $("#ftod").value=f?f.tod||0:1;$("#fton").value=f?f.ton||0:0;$("#fldd").value=f?f.ldd||0:1;$("#fldn").value=f?f.ldn||0:0;
   $("#fnight").value=f?hm(f.night):"";$("#fifr").value=f?hm(f.ifr):"";$("#frem").value=f?.rem||"";$("#fcrew").value=f?.crew||"";
   $("#flLock").hidden=true;if(f){const n=lockedPageOf(f);if(n){$("#flLock").hidden=false;$("#flLock").textContent=`Este vuelo está en la página ${n} del libro, que cerraste. Si lo cambias, la página quedará marcada como modificada.`}}
-  $("#flDel").hidden=!f;$("#flCard").hidden=!f;$("#flConfirm").hidden=true;$("#ftot").dataset.auto=f?"":"1";
+  $("#flDel").hidden=!f;$("#flCard").hidden=!f;$("#flRet").hidden=!f;$("#flConfirm").hidden=true;$("#ftot").dataset.auto=f?"":"1";
   if(pre){const m={d:"#fd",dp:"#fdp",ap:"#fap",dt:"#fdt",at:"#fat",reg:"#freg",typ:"#ftyp",rem:"#frem",pic:"#fpic",crew:"#fcrew"};Object.entries(m).forEach(([k,s])=>{if(pre[k]!=null)$(s).value=pre[k]});if(pre.role)$("#frole").value=pre.role;$("#ftot").value="";}
   $("#fauto").checked=!f&&ls.get("lb_fauto",true);$("#fnInfo").textContent="";$("#acarsBox").hidden=true;$("#acarsBox").innerHTML="";
   calcHint();nightHint();$("#flDlg").hidden=false;setTimeout(()=>$(f?"#ftot":"#fdp").focus(),50);
 }
+/* vuelta: mismo día, aeropuertos al revés, mismo avión y tripulación, PF/PM alternado */
+$("#flRet").onclick=()=>{const f=editF;if(!f)return;
+  const role=f.fpic?"pic":f.fcop?"cop":f.fdual?"dual":f.finst?"inst":"pic";
+  const pf=(+f.tod||0)+(+f.ton||0)+(+f.ldd||0)+(+f.ldn||0)>0;
+  openFl(null,{d:f.d,dp:f.ap,ap:f.dp,typ:f.typ,reg:f.reg,pic:f.pic,crew:f.crew||"",role});
+  $("#ftod").value=pf?0:1;$("#fton").value=0;$("#fldd").value=pf?0:1;$("#fldn").value=0;
+  $("#flTitle").textContent="Vuelta "+(f.ap||"")+"–"+(f.dp||"");setTimeout(()=>$("#fdt").focus(),60)};
 function calcHint(){
   const b=block(clock($("#fdt").value),clock($("#fat").value));
   if(b&&$("#ftot").dataset.auto==="1")$("#ftot").value=hm(b);
@@ -545,7 +573,7 @@ $("#exportBtn").onclick=exportXlsx;$("#exportBtn2").onclick=exportXlsx;$("#expor
 document.addEventListener("click",e=>{if(e.target.closest("[data-backup]"))shareBackup()});
 
 /* ---------- settings ---------- */
-function renderCloud(){
+function renderCloud(){try{setTimeout(()=>renderFeed(),0)}catch{}
   const p=$("#cloudPanel");if(!p)return;
   const c=cloud;
   if(!c.cfg){
@@ -792,6 +820,33 @@ function renderReport(){
       <tr><td>Experiencia reciente (FCL.060)</td><td colspan="3">${rc?(rc.left<0?"Caducada desde "+fmtD(rc.exp):"Válida hasta "+fmtD(rc.exp)):"—"}</td></tr></tbody></table>
     ${lic.length?`<h3>Licencias y habilitaciones</h3><table class="rp-t"><thead><tr><th>Licencia / habilitación</th><th>Última</th><th>Válida hasta</th></tr></thead><tbody>${lic.map(c=>`<tr><td>${esc(c.name)}</td><td>${c.done?fmtD(c.done):"—"}</td><td>${fmtD(c.d)}</td></tr>`).join("")}</tbody></table>`:""}
     <div class="cert-sig"><p>Certifico que los datos de este resumen se corresponden con las anotaciones de mi libro de vuelo.</p>${sg?`<img src="${sg}" alt="Firma" class="sig-img">`:"<br><br>"}<div>______________________________<br>${esc(o.name||"Firma del titular")} · ${fmtD(td)}</div></div></div>`;
+  }else if(repType==="aesa"){
+    const AF=allF(),AT=withOpen(sum(AF)),AS=allS(),td=today(),OPc=opening(),rc=recency(AF,bookS()),sg=sigPng(),C=live("c");
+    const sumT=a=>a.reduce((x,s)=>x+(+s.tot||0),0),ins=AS.filter(s=>roleGroup(s.role)==="ins"),exa=AS.filter(s=>roleGroup(s.role)==="exa"),own=AS.filter(s=>roleGroup(s.role)==="own"||roleGroup(s.role)==="oth");
+    const win=(L,d)=>L.filter(s=>s.d>=addDays(td,-d+1)&&s.d<=td);
+    const lastD=L=>L.length?fmtD(L[L.length-1].d):"—";
+    const insRow=(l,L)=>`<tr><td>${l}</td><td><b>${hm0(sumT(L))}</b></td><td>${L.length}</td><td>${hm0(sumT(win(L,365)))} · ${win(L,365).length}</td><td>${hm0(sumT(win(L,1095)))} · ${win(L,1095).length}</td><td>${lastD(L)}</td></tr>`;
+    const kinds=["LPC","OPC","EBT EVAL","EBT MV","EBT SBT","Skill test","Recurrente","LOFT"];
+    const ownRows=kinds.map(k=>{const L=own.filter(s=>s.kind===k);return L.length?`<tr><td>${k}</td><td>${fmtD(L[L.length-1].d)}</td><td>${esc([L[L.length-1].dev,L[L.length-1].mod].filter(Boolean).join(" · "))}</td></tr>`:""}).join("");
+    const curRows=CUR_CATS.map(([k,l])=>{const L=C.filter(c=>curCat(c)===k&&c.d).sort((a,b)=>a.d.localeCompare(b.d));return L.length?`<tr class="sub"><td colspan="4"><b>${l}</b></td></tr>`+L.map(c=>{const st=curState(c);return `<tr><td>${esc(c.name)}</td><td>${c.done?fmtD(c.done):"—"}</td><td>${fmtD(c.d)}</td><td><span class="chip ${st.cls}">${st.txt}</span></td></tr>`}).join(""):""}).join("");
+    const T90=(()=>{let to=0,ld=0;AF.filter(f=>f.d>=addDays(td,-89)&&f.d<=td).forEach(f=>{to+=(+f.tod||0)+(+f.ton||0);ld+=(+f.ldd||0)+(+f.ldn||0)});return {to,ld}})();
+    try{renderSims()}catch{}
+    const maint=($("#simMaint")?.innerHTML||"").replace(/<button[^>]*>.*?<\/button>/g,"").replace(/sin fecha · añade[^<]*/g,"fecha de caducidad no registrada").replace(/añade “[^<]*/g,"sin registrar");
+    h=`<div class="cert aesa">`+head("Informe de experiencia y vigencias").replace(esc(per),"Datos a "+fmtD(td))+
+    `<p>Titular: <b>${esc(o.name||"—")}</b>${o.lic?` · Licencia <b>${esc(o.lic)}</b>`:""}${o.title?` · ${esc(o.title)}`:""}. Datos tomados del libro de vuelo (EASA FCL.050)${OPc.on?`, incluidas ${hm0(OPc.tot)} h del libro en papel anteriores al ${fmtD(OPc.date)}`:""}.</p>
+    <h3>1 · Totales de vuelo</h3>${totTable(AT,bookS().reduce((a,s)=>a+(+s.tot||0),0)+OPc.sim)}
+    <div class="rp-x">${splitTable(AF,true)}</div>
+    <h3>2 · Experiencia reciente · FCL.060(b)</h3><table class="rp-t"><tbody>
+      <tr><td>Estado</td><td colspan="3">${rc?`<span class="chip ${rc.c}">${rc.left<0?"Caducada":"Vigente"}</span> ${rc.left<0?"desde":"hasta"} <b>${fmtD(rc.exp)}</b>`:"Sin datos"}</td></tr>
+      <tr><td>Últimos 90 días (avión)</td><td>${T90.to} despegues</td><td>${T90.ld} aterrizajes</td><td>${rc?`${rc.n90.to} T/O y ${rc.n90.ld} LDG contando FFS`:""}</td></tr>
+      ${[[90,"Horas últimos 90 días"],[365,"Horas últimos 12 meses"]].map(([d,l])=>{const L=AF.filter(f=>f.d>=addDays(td,-d+1)&&f.d<=td),x=sum(L);return `<tr><td>${l}</td><td><b>${hm0(x.tot)}</b> h</td><td>${fmtInt(L.length)} sectores</td><td>Último vuelo ${AF.length?fmtD(AF[AF.length-1].d):"—"}</td></tr>`}).join("")}</tbody></table>
+    <h3>3 · Actividad como instructor y examinador (FSTD)</h3><div class="rp-x"><table class="rp-t"><thead><tr><th>Función</th><th>Horas totales</th><th>Sesiones</th><th>Últimos 12 meses</th><th>Últimos 3 años</th><th>Última sesión</th></tr></thead><tbody>
+      ${insRow("Instructor · TRI / SFI",ins)}${insRow("Examinador · TRE / SFE",exa)}</tbody></table></div>
+    <h4>Mantenimiento de las certificaciones</h4><div class="rp-maint">${maint}</div>
+    ${ownRows?`<h3>4 · Últimos chequeos propios</h3><table class="rp-t"><thead><tr><th>Chequeo</th><th>Fecha</th><th>Centro · módulo</th></tr></thead><tbody>${ownRows}</tbody></table>`:""}
+    ${curRows?`<h3>5 · Licencias, certificados y caducidades</h3><table class="rp-t"><thead><tr><th>Concepto</th><th>Última vez</th><th>Caduca</th><th>Estado</th></tr></thead><tbody>${curRows}</tbody></table>`:""}
+    <div class="cert-sig"><p>Certifico que los datos de este informe se corresponden con las anotaciones de mi libro de vuelo y mis registros.</p>${sg?`<img src="${sg}" alt="Firma" class="sig-img">`:"<br><br>"}<div>______________________________<br>${esc(o.name||"Firma del titular")} · ${fmtD(td)}</div></div></div>`;
+    $("#repOut").innerHTML=h;return;
   }else if(repType==="cv"){
     const AF=allF(),AT=withOpen(sum(AF)),AS=allS(),td=today(),OPc=opening();
     const byT=[...count(AF,f=>f.typ||"—",f=>+f.tot||0).entries()].sort((a,b)=>b[1]-a[1]);
@@ -829,6 +884,7 @@ function renderReport(){
   $("#repOut").innerHTML=h;
 }
 $("#repTypes").addEventListener("click",e=>{const b=e.target.closest("button[data-r]");if(!b)return;repType=b.dataset.r;ls.set("lb_reptype",repType);renderReport()});
+$("#aesaQuick")&&($("#aesaQuick").onclick=()=>{repType="aesa";ls.set("lb_reptype",repType);go("st");renderReport();setTimeout(()=>{$("#repOut").scrollIntoView({block:"start"});$("#repPrint").click()},250)});
 $("#repPrint").onclick=()=>{document.body.classList.add("printing");setTimeout(()=>{try{window.print()}catch{}document.body.classList.remove("printing")},50)};
 $("#repXlsx").onclick=async()=>{if(repType==="easa"){toast("Para el libro EASA usa Imprimir / PDF; en Excel usa “Exportar todo”.");return}
   await needXLSX();const R=stRange(),F=allF().filter(f=>inRange(f.d,R)),S=allS().filter(s=>inRange(s.d,R));
@@ -2038,6 +2094,40 @@ function exportIcs(list,name){
 }
 $("#repIcs").onclick=()=>{const R=stRange();exportIcs(allF().filter(f=>inRange(f.d,R)),stPreset)};
 
+/* ---------- calendario suscrito ---------- */
+const FEED_SQL=`create or replace function public.ics_feed(t text)
+returns table(kind text, id text, d date, data jsonb)
+language sql security definer set search_path = public stable as $$
+  select e.kind, e.id, e.d, e.data from public.entries e
+  where length(t) >= 24
+    and e.user_id = (select f.user_id from public.entries f
+                     where f.kind = 'x' and f.id = 'feed' and not f.deleted and f.data->>'token' = t limit 1)
+    and not e.deleted
+    and (e.kind = 'c' or (e.kind = 'x' and e.id = 'feed'));
+$$;
+revoke all on function public.ics_feed(text) from public;
+grant execute on function public.ics_feed(text) to anon, authenticated;`;
+const feedRec=()=>live("x").find(r=>r.id==="feed");
+function feedUrl(f){const c=cloud.cfg||{},ref=(c.url||"").match(/https:\/\/([a-z0-9]+)\.supabase\.co/i)?.[1];if(!ref||!c.key||!f)return "";
+  return `https://${location.host||"logbook.pitulines.com"}/api/caducidades?p=${ref}&k=${encodeURIComponent(c.key)}&t=${f.token}`}
+let feedOk=null;
+async function feedCheck(f){if(!cloud.sb||!f){feedOk=null;return}try{const {error}=await cloud.sb.rpc("ics_feed",{t:f.token});feedOk=error?(/function|not find|404|PGRST202/i.test(error.message+error.code)?"nosql":"err"):"ok"}catch{feedOk="err"}renderFeed(true)}
+function renderFeed(skipCheck){const el=$("#feedBody");if(!el)return;const f=feedRec();
+  if(!cloud.user){el.innerHTML=`<p class="note">Primero conecta la nube (arriba): el calendario lee tus caducidades de Supabase.</p>`;return}
+  if(!f){el.innerHTML=`<div class="row"><button class="btn pri" id="feedOn">Activar calendario</button></div>`;$("#feedOn").onclick=()=>{const a=new Uint8Array(24);crypto.getRandomValues(a);const token=[...a].map(x=>"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"[x&63]).join("");const rc=recency(allF(),bookS());putRec("x",{id:"feed",d:"",token,rec:rc?.exp||""});feedOk=null;setTimeout(()=>feedCheck(feedRec()),2500)};return}
+  const u=feedUrl(f),wc=u.replace(/^https:/,"webcal:");
+  el.innerHTML=(feedOk==="nosql"?`<div class="msg w">Falta un paso único en Supabase: abre <b>SQL Editor → New query</b>, pega esto y pulsa <b>Run</b>.</div><pre class="sqlbox">${esc(FEED_SQL)}</pre><div class="row"><button class="btn" id="feedSql">Copiar SQL</button><button class="btn" id="feedRetry">Ya lo he hecho</button></div>`:feedOk==="err"?`<div class="msg w">No he podido comprobar el calendario ahora. Vuelve a intentarlo con conexión.</div>`:feedOk==="ok"?`<div class="msg ok">Calendario activo.</div>`:"")+
+  `<div class="row"><a class="btn pri" href="${esc(wc)}">Suscribirme en este dispositivo</a><button class="btn" id="feedCopy">Copiar enlace</button><button class="btn" id="feedOff">Desactivar</button></div>
+  <p class="note">En el iPhone, "Suscribirme" abre Calendario directamente. En Google Calendar: Otros calendarios → Desde URL → pega el enlace. Para Pitulines, añade ese mismo enlace como calendario. El enlace es privado: quien lo tenga ve tus caducidades; si se filtra, desactívalo y vuelve a activarlo para cambiarlo.</p>`;
+  $("#feedCopy").onclick=async()=>{try{await navigator.clipboard.writeText(u);toast("Enlace copiado")}catch{prompt("Copia el enlace",u)}};
+  $("#feedOff").onclick=()=>{removeRec("x","feed");feedOk=null;renderFeed(true)};
+  if($("#feedSql"))$("#feedSql").onclick=async()=>{try{await navigator.clipboard.writeText(FEED_SQL);toast("SQL copiado")}catch{}};
+  if($("#feedRetry"))$("#feedRetry").onclick=()=>feedCheck(f);
+  if(!skipCheck&&feedOk==null)feedCheck(f);
+}
+// mantiene en el calendario la fecha de experiencia reciente
+function feedSyncRec(){const f=feedRec();if(!f)return;const rc=recency(allF(),bookS()),exp=rc?.exp||"";if(exp!==(f.rec||""))putRec("x",{...f,rec:exp})}
+
 /* ---------- firma ---------- */
 const sigPng=()=>live("x").find(r=>r.id==="sig")?.png||"";
 (function sigPad(){
@@ -2400,16 +2490,24 @@ $("#cvYear").addEventListener("change",e=>{if(!e.target.value)return;cvRange="y:
 window.LB={putRec,nightCalc,sunElev,apt,gcNm,loadApts,withNight,allF,allS,render:()=>render(),live};
 $("#verNote").textContent="Versión "+APP_VERSION+" · funciona sin conexión; los cambios se suben al recuperar red.";
 $("#file").setAttribute("accept",".xlsx,.xls,.csv,.pdf,.json");
-const _render=render;render=function(){CUST=null;_render();setSync();renderCur();renderApts();renderPlanned();renderSig();renderCover();renderStats();renderReport()};
+const _render=render;render=function(){CUST=null;_render();setSync();renderCur();renderApts();renderPlanned();renderSig();renderCover();renderStats();renderReport();try{feedSyncRec();if(view==="set")renderFeed()}catch(e){console.warn(e)}};
 go(ls.get("lb_view","sum"));
 try{localStorage.setItem("lb_skin",JSON.stringify("libro"))}catch{}applySkin("libro",ls.get("lb_mode","auto"));applyFlMode(ls.get("lb_flmode","table"));renderLook();
 $("#repMin").value=REPORT_MIN();$("#repMinSave").onclick=()=>{ls.set("lb_report",Math.max(0,+$("#repMin").value||60));toast("Guardado");renderStats()};
 renderSimCfg();
-render();renderAiKey();renderOwner();renderOpen();renderGoal();connectCloud();
+loadStore().then(()=>{
+  if(E.cfg)cfgApply();else if(Object.keys(cfgCollect()).length)cfgPush();
+  render();renderAiKey();renderOwner();renderOpen();renderGoal();renderSimCfg();connectCloud();
+});
 setTimeout(()=>loadApts(),400);
 if("serviceWorker" in navigator&&location.protocol!=="file:"){
+  const hadCtl=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.register("sw.js").then(reg=>{
-    reg.addEventListener("updatefound",()=>{const w=reg.installing;w&&w.addEventListener("statechange",()=>{if(w.state==="installed"&&navigator.serviceWorker.controller)toast("Nueva versión lista: cierra y abre la app.")})});
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden)reg.update().catch(()=>{})});
+    setInterval(()=>reg.update().catch(()=>{}),30*60e3);
   }).catch(()=>{});
+  // el service worker nuevo toma el control en cuanto se instala: se ofrece recargar
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadCtl)$("#updBanner").hidden=false});
+  $("#updBtn").onclick=async()=>{try{await flushStore()}catch{}location.reload()};
 }
 })();

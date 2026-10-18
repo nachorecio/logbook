@@ -41,3 +41,18 @@ create policy "own rows select" on public.entries for select using (auth.uid() =
 create policy "own rows insert" on public.entries for insert with check (auth.uid() = user_id);
 create policy "own rows update" on public.entries for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own rows delete" on public.entries for delete using (auth.uid() = user_id);
+
+-- Calendario suscrito de caducidades (logbook.pitulines.com/api/caducidades)
+-- Devuelve solo las caducidades y la fecha de experiencia reciente del dueño del token secreto.
+create or replace function public.ics_feed(t text)
+returns table(kind text, id text, d date, data jsonb)
+language sql security definer set search_path = public stable as $$
+  select e.kind, e.id, e.d, e.data from public.entries e
+  where length(t) >= 24
+    and e.user_id = (select f.user_id from public.entries f
+                     where f.kind = 'x' and f.id = 'feed' and not f.deleted and f.data->>'token' = t limit 1)
+    and not e.deleted
+    and (e.kind = 'c' or (e.kind = 'x' and e.id = 'feed'));
+$$;
+revoke all on function public.ics_feed(text) from public;
+grant execute on function public.ics_feed(text) to anon, authenticated;
