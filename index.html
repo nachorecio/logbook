@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pilot Logbook</title>
+<meta name="description" content="Libro de vuelo personal EASA: vuelos, simulador, límites FTL y experiencia reciente.">
+<meta name="theme-color" content="#1F3B5C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Logbook">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<script>try{var _s=JSON.parse(localStorage.getItem("lb_skin")||"\"libro\""),_m=JSON.parse(localStorage.getItem("lb_mode")||"\"auto\"");document.documentElement.dataset.skin=_s;if(_m!=="auto")document.documentElement.dataset.theme=_m}catch(e){}</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-in gut">
+    <div class="brand"><b>Pilot Logbook</b><span>EASA FCL.050</span></div>
+    <nav class="tabs" id="tabs">
+      <button data-v="sum" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 4.5h6a2.5 2.5 0 0 1 2.5 2.5v13A2 2 0 0 0 10.5 18H4z"/><path d="M20 4.5h-6A2.5 2.5 0 0 0 11.5 7v13a2 2 0 0 1 2-2H20z"/></svg><span>Resumen</span></button>
+      <button data-v="fl"><svg viewBox="0 0 24 24"><path d="M21 15.5v-2l-8-5V3.5a1 1 0 0 0-2 0v5l-8 5v2l8-2.5v5l-2 1.5V21l3-1 3 1v-1.5l-2-1.5v-5z" fill="currentColor" stroke="none"/></svg><span>Vuelos</span></button>
+      <button data-v="sim"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span><span class="lg">Simulador</span><span class="sh">Sim</span></span></button>
+      <button data-v="map"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/></svg><span>Mapa</span></button>
+      <button data-v="fat"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Fatiga</span></button>
+      <button data-v="st"><svg viewBox="0 0 24 24"><path d="M4 20v-7M10 20V5M16 20v-10M22 20H2"/></svg><span><span class="lg">Estadísticas</span><span class="sh">Stats</span></span></button>
+      <button data-v="imp"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v3h16v-3"/></svg><span><span class="lg">Importar</span><span class="sh">Import</span></span></button>
+      <button data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span>Ajustes</span></button>
+    </nav>
+    <button class="sync local" id="sync" style="background:none;border:0;color:inherit;cursor:pointer"><i></i>Solo este dispositivo</button>
+  </div>
+</header>
+
+<main class="gut">
+  <button class="livebar" id="liveBar" hidden></button>
+  <div class="banner" id="bkBanner" hidden><span></span><button class="btn" data-backup>Hacer copia</button></div>
+  <div class="banner" id="cloudBanner" hidden><span>Tus datos solo están en este dispositivo. Conecta la nube para verlos también en el móvil y el ordenador.</span><button class="btn" data-go="set">Conectar</button></div>
+  <!-- RESUMEN -->
+  <section class="view" id="v-sum">
+    <div class="banner alert" id="curBanner" hidden></div>
+    <div class="cover">
+      <div class="cover-l">
+        <div class="cv-k">Libro de vuelo del piloto · EASA FCL.050</div>
+        <h1 class="cv-name" id="cvName">—</h1>
+        <div class="cv-sub" id="cvSub"></div>
+        <div class="cv-tot"><div class="cv-big"><span id="cvH">0</span><small>h</small><span id="cvM">00</span><small>min</small></div><div class="cv-lab">Tiempo total de vuelo · col. 6</div></div>
+        <div class="ledger" id="cvLedger"></div>
+        <div class="cv-actions"><button class="btn gold" id="cvLive">● Vuelo en directo</button><label class="btn ghost" for="acarsQuick">Foto ACARS</label><button class="btn ghost" data-go="fl">Abrir el libro</button></div>
+      </div>
+      <div class="cover-r"><canvas id="cvMap"></canvas><div class="cv-range" id="cvRange" role="group" aria-label="Rutas a mostrar"><select id="cvYear" aria-label="Año"></select><button data-cr="all">All</button><button data-cr="month" id="cvMonth">Mes</button><button data-cr="next" id="cvNext">Next</button></div><div class="cv-mapk" id="cvMapK"></div><button class="cv-expand" id="cvExpand" type="button" aria-label="Ampliar el mapa">⤢ Ampliar mapa</button></div>
+    </div>
+    <div class="two sumsplit">
+      <div class="panel"><div class="row"><h3>Horas por función · aviación general y Airbus</h3><span class="spacer"></span><span class="note" id="splitNote"></span></div><div class="rp-x" id="splitTbl"></div></div>
+      <div class="panel"><div class="row"><h3>Simulador · TRI y TRE</h3><span class="spacer"></span><button class="btn sm" data-go="sim">Ver sesiones</button></div><div class="rp-x" id="insTbl"></div><p class="note" id="insNote"></p></div>
+    </div>
+    <div class="three">
+      <div class="panel">
+        <div class="row"><h3>Caducidades</h3><span class="spacer"></span><button class="btn sm" id="curIcs">Al calendario</button><button class="btn sm" id="curOpen">Gestionar</button></div>
+        <div id="curList" class="curlist"></div>
+      </div>
+      <div class="panel">
+        <h3>Límites de horas de vuelo · ORO.FTL.210</h3>
+        <div id="ftl"></div>
+        <p class="note">Calculado con el tiempo total de vuelo (col. 6). Los límites FTL se aplican a block time: tómalo como referencia, no como registro oficial.</p>
+      </div>
+      <div class="panel">
+        <h3>Experiencia reciente · FCL.060(b)</h3>
+        <div id="recent"></div>
+      </div>
+    </div>
+    <div class="three">
+      <div class="panel"><h3>Este mes</h3><div id="thisMonth" class="tm"></div><div class="spark" id="tmSpark"></div><p class="note">Últimos 12 meses</p></div>
+      <div class="panel"><h3>Hitos y objetivos</h3><div id="miles" class="miles"></div></div>
+      <div class="panel"><h3>Horas por tipo</h3><div class="types" id="types"></div></div>
+    </div>
+  </section>
+
+  <!-- VUELOS -->
+  <section class="view" id="v-fl" hidden>
+    <div class="toolbar">
+      <h2>Vuelos</h2>
+      <input type="search" id="q" placeholder="Buscar aeropuerto, matrícula, tipo…">
+      <select id="yr"><option value="">Todos los años</option></select>
+      <button class="btn" id="flFiltBtn">Filtros</button>
+      <span class="spacer"></span>
+      <button class="btn" id="liveBtn">● En directo</button>
+      <button class="btn" id="exportBtn">Exportar Excel</button>
+      <label class="btn" for="acarsQuick">Foto ACARS</label><input type="file" id="acarsQuick" accept="image/*" hidden>
+      <button class="btn pri" id="addFl">+ Vuelo</button>
+    </div>
+    <div class="filters" id="flFilters" hidden>
+      <select id="fRole"><option value="">Función: todas</option><option value="pic">PIC</option><option value="cop">Copiloto</option><option value="inst">Instructor</option><option value="dual">Dual</option></select>
+      <select id="fTyp"><option value="">Tipo: todos</option></select>
+      <select id="fReg"><option value="">Matrícula: todas</option></select>
+      <label class="chk"><input type="checkbox" id="fNight"> Con noche</label>
+      <label class="chk"><input type="checkbox" id="fLdg"> Con aterrizaje mío</label>
+      <button class="btn sm" id="fClear">Quitar filtros</button>
+    </div>
+    <div class="retbar" id="retBar" hidden></div>
+    <div class="planned panel" id="planned" hidden></div>
+    <div class="row viewbar">
+      <div class="seg" id="flViewSeg" role="group" aria-label="Vista"><button data-fv="table">Tabla</button><button data-fv="page">Página EASA</button></div>
+      <span class="note" id="pInfo"></span><span class="spacer"></span>
+      <button class="btn pri" id="flPrint">Imprimir / PDF</button>
+    </div>
+    <div id="flTableWrap"><div class="tbwrap" id="flTable"></div><button class="btn" id="flMore" hidden>Mostrar más</button></div>
+    <div id="flPageWrap" hidden>
+      <div class="row pager"><button class="btn" id="bPrev" aria-label="Página anterior">‹</button>Página <input id="bNum" inputmode="numeric" aria-label="Página"> de <span id="bTot">1</span><button class="btn" id="bNext" aria-label="Página siguiente">›</button><span class="note">Ir a la fecha</span><input type="date" id="bDate" aria-label="Ir a la fecha"></div>
+      <div id="flPage"></div>
+      <p class="note">El libro es fijo: el buscador y los filtros se aplican a la vista de tabla.</p>
+    </div>
+  </section>
+
+  <!-- SIMULADOR -->
+  <section class="view" id="v-sim" hidden>
+    <div class="toolbar">
+      <h2>Simulador</h2>
+      <input type="search" id="sq" placeholder="Buscar módulo, escenario, centro…">
+      <select id="syr" aria-label="Año"><option value="">Todos los años</option></select>
+      <select id="sgrp" aria-label="Rol"><option value="">Rol: todos</option><option value="ins">Instructor</option><option value="exa">Examinador</option><option value="own">Propias</option></select>
+      <select id="skf" aria-label="Tipo de sesión"><option value="">Tipo: todos</option></select>
+      <span class="spacer"></span>
+      <button class="btn pri" id="addSim">+ Sesión</button>
+    </div>
+    <div class="sumgrid" id="simTop"></div>
+    <div class="three">
+      <div class="panel"><h3>Instructor y examinador</h3><div id="simMaint" class="maint"></div></div>
+      <div class="panel"><h3>Mis chequeos</h3><div id="simOwn"></div></div>
+      <div class="panel"><h3>Próximas sesiones</h3><div id="simNext" class="pl-list"></div></div>
+    </div>
+    <div class="two">
+      <div class="panel"><h3>Horas por mes · 24 meses</h3><div class="chart" id="simMonths"></div><div class="legend" id="simMonthsLg"></div></div>
+      <div class="panel"><h3>Por tipo de sesión</h3><div class="rank" id="simKinds"></div><h3>Centros y dispositivos</h3><div class="rank" id="simDevs"></div></div>
+    </div>
+    <div class="two">
+      <div class="panel"><h3>Horas por año</h3><div class="chart" id="simYears"></div></div>
+      <div class="panel"><h3>Día de la semana</h3><div class="chart" id="simDow"></div></div>
+    </div>
+    <div class="panel simlog"><div class="row simlog-bar"><h3>Libro de simulador</h3><div class="seg" id="simViewSeg" role="group" aria-label="Vista"><button data-sv="table">Tabla</button><button data-sv="page">Página EASA</button></div><span class="note" id="simCount"></span><span class="spacer"></span>
+      <button class="btn pri" id="simPrint">Imprimir / PDF</button></div>
+      <div class="row pager" id="simPager" hidden><button class="btn" id="spPrev" aria-label="Página anterior">‹</button>Página <input id="spNum" inputmode="numeric" aria-label="Página"> de <span id="spTot">1</span><button class="btn" id="spNext" aria-label="Página siguiente">›</button><span class="note">Ir a la fecha</span><input type="date" id="spDate" aria-label="Ir a la fecha"></div>
+      <div id="simList"></div></div>
+  </section>
+
+
+  <!-- ESTADÍSTICAS -->
+  <section class="view" id="v-map" hidden>
+    <div class="toolbar">
+      <h2>Mapa</h2>
+      <select id="mpY" aria-label="Periodo"></select>
+      <div class="seg" id="mpG" role="group" aria-label="Aviación"><button data-g="">Todo</button><button data-g="ab">Airbus</button><button data-g="ga">Aviación general</button></div>
+      <span class="note" id="mpK"></span>
+    </div>
+    <div class="panel mapfull" id="mpPanel">
+      <div class="row"><h3 id="mpT">Rutas</h3><span class="spacer"></span><button class="btn sm" id="mpOut" aria-label="Alejar">−</button><button class="btn sm" id="mpIn" aria-label="Acercar">+</button><button class="btn sm" id="mpFit">Ajustar</button><button class="btn sm" id="mpFs">Pantalla completa</button></div>
+      <div class="mapbox big"><canvas id="bigMap"></canvas></div>
+      <p class="note">Rueda, botones o pellizco para acercar; arrastra para mover. Toca un aeropuerto para ver sus rutas.</p>
+    </div>
+    <div class="sumgrid" id="mpKpi"></div>
+    <div class="mpgrid">
+      <div class="panel"><div class="row"><h3>Destinos · llegadas</h3><span class="spacer"></span><input id="mpQ" type="search" placeholder="Buscar aeropuerto, ciudad o país" aria-label="Buscar aeropuerto"></div><label class="row note" id="mpBaseL"><input type="checkbox" id="mpBase"> Incluir la base</label><div class="rp-x" id="mpTbl"></div><div class="row" id="mpMore"></div></div>
+      <div class="mpside">
+        <div class="panel" id="mpSel"></div>
+        <div class="panel"><h3>Países · llegadas</h3><div class="rank" id="mpCty"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-fat" hidden>
+    <div class="toolbar">
+      <h2>Fatiga</h2>
+      <div class="seg" id="ftScope" role="group" aria-label="Vuelos"><button data-s="ab">Línea (Airbus)</button><button data-s="all">Todos</button></div>
+      <label class="row note"><input type="checkbox" id="ftSim" checked> Contar simuladores como actividad</label>
+      <label class="row note">Firma en base <input id="ftRepMin" type="number" min="30" max="120" step="5" style="width:64px"> min antes, desde <select id="ftRepFrom" aria-label="Desde el año"></select></label>
+      <span class="note" id="ftK"></span>
+    </div>
+    <div class="sumgrid" id="ftKpi"></div>
+    <div class="panel">
+      <div class="row"><h3>Índice de fatiga por mes</h3><span class="spacer"></span><span class="note">Toca un mes para ver el detalle</span></div>
+      <div class="ftheat" id="ftHeat"></div>
+      <div class="legend" id="ftLg"></div>
+    </div>
+    <div class="two">
+      <div class="panel"><h3>Meses con más carga</h3><div class="rank" id="ftTop"></div></div>
+      <div class="panel"><h3>Meses más tranquilos (con actividad)</h3><div class="rank" id="ftLow"></div></div>
+    </div>
+    <div class="panel"><h3>Por año</h3><div class="rp-x" id="ftYears"></div></div>
+    <div class="panel" id="ftMonth"></div>
+    <details class="panel ftnote"><summary><b>Cómo se calcula</b></summary><div id="ftHow"></div></details>
+  </section>
+
+  <section class="view" id="v-st" hidden>
+    <div class="toolbar">
+      <h2>Estadísticas</h2>
+      <div class="seg" id="stPresets" role="group" aria-label="Periodo">
+        <button data-p="90d">90 días</button><button data-p="12m">12 meses</button><button data-p="ytd">Este año</button><button data-p="ly">Año pasado</button><button data-p="all">Todo</button><button data-p="custom">Fechas…</button>
+      </div>
+      <span class="row" id="stCustom" hidden><input type="date" id="stFrom" aria-label="Desde"> – <input type="date" id="stTo" aria-label="Hasta"></span>
+      <span class="note" id="stPeriod"></span>
+    </div>
+    <div class="sumgrid" id="stKpi"></div>
+    <div class="panel">
+      <div class="row"><h3>Mapa de rutas</h3><span class="spacer"></span><button class="btn sm" id="mapOut" aria-label="Alejar">−</button><button class="btn sm" id="mapIn" aria-label="Acercar">+</button><button class="btn sm" id="mapFit">Ajustar</button></div>
+      <div class="mapbox"><canvas id="stMap"></canvas></div>
+      <div class="sumgrid dist" id="stDist"></div>
+      <p class="note" id="stMapNote"></p>
+    </div>
+    <div class="panel"><h3 id="stMonthsT">Horas por mes</h3><div class="chart" id="stMonths"></div></div>
+    <div class="two">
+      <div class="panel"><h3>Comparativa por año · horas por mes</h3><div class="chart" id="stYears"></div><div class="legend" id="stYearsLg"></div></div>
+      <div class="panel"><h3>Comandantes con los que más has volado</h3><div class="rank" id="stPics"></div></div>
+    </div>
+    <div class="panel"><h3>Calendario de actividad</h3><div class="heat" id="stHeat"></div></div>
+    <div class="panel"><div class="row"><h3>Actividad, FDP y descanso</h3><span class="note" id="stActK"></span></div><div id="stAct"></div><p class="note">Estimación a partir de tus vuelos: presentación = primer OUT menos el tiempo de Ajustes; fin = último IN. Referencia para ti, no sustituye al control de la compañía.</p></div>
+    <div class="two">
+      <div class="panel"><h3>Función a bordo</h3><div id="stRoles"></div><p class="note" id="stOps"></p></div>
+      <div class="panel"><h3>Horas acumuladas · historial completo</h3><div class="chart" id="stCum"></div></div>
+    </div>
+    <div class="three">
+      <div class="panel"><h3 id="stDestT">Destinos más volados</h3><div class="rank" id="stDest"></div></div>
+      <div class="panel"><h3>Rutas más voladas</h3><div class="rank" id="stRoutes"></div></div>
+      <div class="panel"><h3>Países y zonas (llegadas)</h3><div class="rank" id="stZones"></div></div>
+    </div>
+    <div class="three">
+      <div class="panel"><h3>Horas por día de la semana</h3><div class="chart" id="stDow"></div></div>
+      <div class="panel"><h3>Hora de salida (UTC)</h3><div class="chart" id="stHour"></div></div>
+      <div class="panel"><h3>Duración de los sectores</h3><div class="chart" id="stDur"></div></div>
+    </div>
+    <div class="three">
+      <div class="panel"><h3>Matrículas más voladas</h3><div class="rank" id="stRegs"></div></div>
+      <div class="panel"><h3>Tipos de avión</h3><div class="rank" id="stTypes"></div><h3>Simulador por rol</h3><div class="rank" id="stSim"></div></div>
+      <div class="panel"><h3>Récords</h3><dl class="kv" id="stRec"></dl></div>
+    </div>
+
+    <div class="panel"><div class="row"><h3>Pasaporte de aeropuertos</h3><span class="note" id="stPassK"></span></div><div class="rp-scroll" id="stPass"></div></div>
+
+    <div class="panel poster-panel">
+      <div class="poster-wrap"><canvas id="poster" width="1080" height="1350" aria-label="Póster del resumen anual"></canvas></div>
+      <div class="poster-side">
+        <h3>Resumen anual</h3>
+        <p>Tu año en una imagen: horas, rutas en el mapa, destinos favoritos y récords. Toma los colores y letras del tema elegido en Ajustes.</p>
+        <div class="row"><select id="posterYear" aria-label="Año"></select><button class="btn pri" id="posterPng">Descargar imagen</button></div>
+        <p class="note" id="posterNote"></p>
+      </div>
+    </div>
+
+    <div class="toolbar" style="margin-top:12px">
+      <h2>Informes</h2>
+      <div class="seg" id="repTypes" role="group" aria-label="Tipo de informe">
+        <button data-r="easa">Libro EASA</button><button data-r="period">Horas del periodo</button><button data-r="cv">Experiencia (CV)</button><button data-r="cert">Certificado</button><button data-r="ftl">Control FTL</button><button data-r="sim">Simulador</button>
+      </div>
+      <span class="spacer"></span>
+      <label class="chk" id="easaOnlyWrap" hidden><input type="checkbox" id="easaOnly"> Solo páginas cerradas</label>
+      <button class="btn" id="repIcs">Calendario .ics</button><button class="btn" id="repXlsx">Excel</button><button class="btn pri" id="repPrint">Imprimir / PDF</button>
+    </div>
+    <p class="note">El informe usa el mismo periodo que las estadísticas (salvo “Experiencia”, que es siempre el total).</p>
+    <div class="report" id="repOut"></div>
+  </section>
+
+  <!-- IMPORTAR -->
+  <section class="view" id="v-imp" hidden>
+    <h2>Importar vuelos y simuladores</h2>
+    <div class="drop" id="drop">
+      <strong>Arrastra aquí tu Excel (.xlsx, .xls, .csv) o PDF</strong>
+      <span class="note">Excel: detecto las columnas y puedes corregir la asignación. PDF: leo el texto de cada página y reconozco las filas; con tu clave de Claude (en Ajustes) la lectura es mucho más fiable.</span>
+      <label class="btn pri" for="file">Elegir archivo</label>
+      <input type="file" id="file" accept=".xlsx,.xls,.csv,.pdf" hidden>
+    </div>
+    <div id="impArea" class="panel" hidden></div>
+    <div class="panel">
+      <h3>Roster / programación</h3>
+      <p class="note">Sube el PDF, una foto o una captura de tu roster, o pega su texto. Claude saca los sectores y quedan como <b>programados</b> en Vuelos; cada uno se confirma luego con los tiempos reales. Necesita tu clave de Claude (Ajustes).</p>
+      <div class="row"><label class="btn pri" for="rosFile">PDF, foto o captura</label><input type="file" id="rosFile" accept=".pdf,image/*,.txt" hidden></div>
+      <textarea id="rosPaste" rows="4" placeholder="…o pega aquí el texto del roster (copiado de la app de la compañía o de un correo)"></textarea>
+      <div class="row"><button class="btn" id="rosText">Leer el texto pegado</button></div>
+      <div id="rosArea" hidden></div>
+    </div>
+    <div class="two">
+      <div class="panel">
+        <h3>Informe de Simple Aviation Training</h3>
+        <p class="note">Arrastra arriba el PDF del logbook de SAT (el que sacas de su web cada mes). Lo reconozco solo: junto los alumnos de la misma sesión y las franjas que se solapan, pongo como TRE las LPC, revalidaciones, renovaciones y skill tests, y no duplico las sesiones que ya tienes.</p>
+      </div>
+      <div class="panel">
+        <h3>Exámenes de Pitulin</h3>
+        <p class="note">En Pitulin → Exámenes → Archivo, selecciona el texto de cada año, cópialo y pégalo aquí. Los que coincidan con una sesión de SAT ese día la marcan como TRE; los que no, entran como sesión TRE nueva (2 h por candidato, máximo 4 h).</p>
+        <textarea id="pitTxt" rows="4" placeholder="20 sept 2026&#10;REVALIDACIÓN&#10;Nicoló Pradella&#10;…"></textarea>
+        <div class="row"><button class="btn" id="pitGo">Pasar a sesiones TRE</button></div><div id="pitMsg"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Vuelos como LSC</h3>
+      <p class="note">Una línea por vuelo con la fecha y el número, por ejemplo <code>14/10/2026 VY1822</code>. Añado “LSC” en observaciones.</p>
+      <textarea id="lscTxt" rows="4" placeholder="14/10/2026 VY1822&#10;27/09/2026 VY3210"></textarea>
+      <label class="row note"><input type="checkbox" id="lscInst"> Anotar también el tiempo en la columna de instructor (consúltalo con tu ATO)</label>
+      <div class="row"><button class="btn" id="lscGo">Marcar como LSC</button></div><div id="lscMsg"></div>
+    </div>
+    <div class="panel">
+      <h3>Copia de seguridad</h3>
+      <p class="note">Además de la nube, guarda una copia cada semana. En el móvil, “Guardar copia” abre el menú de compartir: elige Google Drive o Archivos. En el ordenador se descarga el archivo. Si pasan 7 días sin copia, te lo recuerdo en el Resumen.</p>
+      <div class="row"><button class="btn pri" data-backup>Guardar copia</button><button class="btn" id="exportBtn2">Exportar todo a Excel</button><button class="btn" id="exportJson">Descargar JSON</button><span class="note" id="bkNote"></span></div>
+      <p class="note" id="countNote"></p>
+    </div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="view" id="v-set" hidden>
+    <h2>Ajustes</h2>
+    <div class="panel set wide">
+      <h3>Apariencia</h3>
+      <div class="skins" id="skinPick"></div>
+      <div class="row"><span class="note">Modo</span><div class="seg" id="modePick" role="group" aria-label="Modo"><button data-mode="auto">Automático</button><button data-mode="light">Claro</button><button data-mode="dark">Oscuro</button></div><span class="note" id="modeNote" hidden>El tema Cabina es siempre oscuro.</span></div>
+    </div>
+    <div class="panel set" id="cloudPanel"></div>
+    <div class="panel set">
+      <h3>Titular del libro</h3>
+      <p class="note">Aparece en la cabecera de los informes.</p>
+      <div class="f"><label for="oName">Nombre</label><input id="oName" autocomplete="name"></div>
+      <div class="f"><label for="oLic">Nº de licencia</label><input id="oLic" placeholder="ES.FCL.xxxxx"></div>
+      <div class="f"><label for="oTitle">Cargo (opcional)</label><input id="oTitle" placeholder="A320 TRI/TRE Captain"></div>
+      <div class="row"><button class="btn" id="oSave">Guardar</button></div>
+    </div>
+    <div class="panel set wide">
+      <h3>Horas anteriores (saldo inicial)</h3>
+      <p class="note">Las horas que ya tenías antes del primer vuelo que llevas en la app, por columnas del libro. Se suman a la portada, a los hitos, al resumen de experiencia y a “total from previous pages” de la primera página EASA. Las estadísticas por periodo no las incluyen.</p>
+      <div class="row"><div class="f"><label for="opDate">Horas hasta el</label><input id="opDate" type="date"></div><div class="f" style="flex:1"><label for="opNote">Nota</label><input id="opNote" placeholder="Arrastrado del libro de papel, págs. 1–63"></div></div>
+      <div class="opgrid" id="opGrid"></div>
+      <div class="row"><button class="btn" id="opSave">Guardar</button><button class="btn" id="opDel">Quitar</button><span class="note" id="opState"></span></div>
+    </div>
+    <div class="panel set">
+      <h3>Foto del ACARS y lectura de PDF con Claude</h3>
+      <p class="note">Con una clave de la API de Claude puedes dar de alta vuelos con una foto del ACARS, y los PDF y los Excel raros se convierten en filas con mucha más precisión. La clave se guarda solo en este dispositivo y el texto se envía directamente a Anthropic. Consíguela en <code>console.anthropic.com</code>.</p>
+      <div class="f"><label for="aiKey">Clave API</label><input id="aiKey" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
+      <div class="row"><button class="btn" id="aiKeySave">Guardar clave</button><button class="btn" id="aiKeyDel">Quitar</button><span class="note" id="aiKeyNote"></span></div>
+    </div>
+    <div class="panel set">
+      <h3>Firma</h3>
+      <p class="note">Dibuja tu firma con el dedo o el ratón. Se imprime en los informes y en las páginas del libro que cierres.</p>
+      <canvas id="sigPad" width="600" height="200" class="sigpad" aria-label="Zona para dibujar la firma"></canvas>
+      <div class="row"><button class="btn pri" id="sigSave">Guardar firma</button><button class="btn" id="sigClear">Limpiar</button><button class="btn" id="sigDel">Quitar la guardada</button></div>
+      <div id="sigCur"></div>
+    </div>
+    <div class="panel set">
+      <h3>Instructor y examinador</h3>
+      <p class="note">Mínimos que quieres vigilar en la pestaña Simulador. Ajústalos a FCL.940, FCL.1025 y a lo que pida tu ATO.</p>
+      <div class="fgrid">
+        <div class="f s2"><label for="scIns">Sesiones de instrucción / 12 meses</label><input id="scIns" type="number" min="0"></div>
+        <div class="f s2"><label for="scInsMin">de al menos (h:mm)</label><input id="scInsMin" class="t" placeholder="3:00"></div>
+        <div class="f s2"><label for="scChk">Chequeos como examinador / 12 meses</label><input id="scChk" type="number" min="0"></div>
+      </div>
+      <span class="note">Tipos de sesión que cuentan como chequeo:</span>
+      <div class="chkgrid" id="scChecks"></div>
+      <label class="chk"><input type="checkbox" id="scBook"> Anotar por defecto en el libro (col. 11) las sesiones como instructor o examinador</label>
+      <div class="row"><button class="btn" id="scSave">Guardar</button></div>
+    </div>
+    <div class="panel set">
+      <h3>Actividad y FDP</h3>
+      <div class="f"><label for="repMin">Presentación antes del primer OUT (minutos)</label><input id="repMin" type="number" min="0" max="240" step="5"></div>
+      <div class="row"><button class="btn" id="repMinSave">Guardar</button><span class="note">Se usa para estimar la hora de presentación y la FDP de cada día de actividad.</span></div>
+    </div>
+    <div class="panel set">
+      <h3>Objetivo personal</h3>
+      <p class="note">Un objetivo de horas con fecha opcional. Aparece en la portada con el ritmo que necesitas.</p>
+      <div class="fgrid">
+        <div class="f s2"><label for="gCol">Columna</label><select id="gCol"><option value="tot">Tiempo total</option><option value="fpic">PIC</option><option value="finst">Instructor</option><option value="fcop">Copiloto</option><option value="night">Noche</option></select></div>
+        <div class="f s1"><label for="gHours">Horas</label><input id="gHours" type="number" min="1" placeholder="1500"></div>
+        <div class="f s1"><label for="gDate">Para el</label><input id="gDate" type="date"></div>
+        <div class="f s2"><label for="gLabel">Nombre (opcional)</label><input id="gLabel" placeholder="1500 h para el ATPL"></div>
+      </div>
+      <div class="row"><button class="btn" id="gSave">Guardar objetivo</button><button class="btn" id="gDel">Quitar</button></div>
+    </div>
+    <div class="panel set">
+      <h3>Noche automática</h3>
+      <p class="note">Noche según EASA: entre el final y el comienzo del crepúsculo civil (sol 6° bajo el horizonte), calculada minuto a minuto con la posición del avión en la ortodrómica. También decide si el despegue y el aterrizaje fueron de noche.</p>
+      <div class="row"><button class="btn" id="nightAll">Recalcular la noche de todos los vuelos</button></div>
+      <div class="confirm" id="nightConfirm" hidden><span>Se sobrescribirán la noche y los T/O-LDG de noche de <b id="nightCount">0</b> vuelos con horas off/on y aeropuertos conocidos.</span><button class="btn danger" id="nightYes">Recalcular</button><button class="btn" id="nightNo">Cancelar</button></div>
+      <p class="note" id="nightMsg"></p>
+    </div>
+    <div class="panel set">
+      <h3>Aeropuertos propios</h3>
+      <p class="note">La app trae unos 8.700 aeropuertos. Si falta alguno de tu libro, añádelo aquí (grados decimales).</p>
+      <div class="fgrid">
+        <div class="f s1"><label for="caI">OACI</label><input id="caI" maxlength="4" placeholder="LELL" class="t"></div>
+        <div class="f s1"><label for="caLa">Latitud</label><input id="caLa" inputmode="decimal" placeholder="41.521"></div>
+        <div class="f s1"><label for="caLo">Longitud</label><input id="caLo" inputmode="decimal" placeholder="2.105"></div>
+        <div class="f s2"><label for="caN">Nombre</label><input id="caN" placeholder="Sabadell"></div>
+        <div class="f s1" style="align-self:end"><button class="btn" id="caAdd">Añadir</button></div>
+      </div>
+      <div id="caList" class="calist"></div>
+      <p class="note" id="missApts"></p>
+    </div>
+    <div class="panel set">
+      <h3>Instalar en el dispositivo</h3>
+      <ul class="steps">
+        <li><b>iPhone / iPad:</b> abre la web en Safari → botón Compartir → “Añadir a pantalla de inicio”.</li>
+        <li><b>Android:</b> en Chrome, menú ⋮ → “Instalar aplicación”.</li>
+        <li><b>Mac / PC:</b> en Chrome o Edge, icono de instalar en la barra de direcciones. En Safari (Mac): Archivo → “Añadir al Dock”.</li>
+      </ul>
+      <p class="note" id="verNote"></p>
+    </div>
+  </section>
+</main>
+
+<button class="fab" id="fab" aria-label="Añadir vuelo">+</button>
+<div class="toast" id="toast" hidden></div>
+
+<!-- flight dialog -->
+<div class="scrim" id="flDlg" hidden>
+  <form class="dlg" id="flForm" autocomplete="off">
+    <div class="row"><h2 id="flTitle">Nuevo vuelo</h2><span class="spacer"></span><label class="btn" for="acarsFile">Foto del ACARS</label><input type="file" id="acarsFile" accept="image/*" hidden><button type="button" class="btn" data-close>Cerrar</button></div>
+    <div class="acars" id="acarsBox" hidden></div>
+    <div class="fgrid">
+      <div class="f s2"><label for="fd"><em>1</em>Fecha</label><input id="fd" type="date" required></div>
+      <div class="f s2"><label for="ftyp"><em>4</em>Tipo / variante</label><input id="ftyp" placeholder="A320-214" list="typList"></div>
+      <div class="f s2"><label for="freg"><em>4</em>Matrícula</label><input id="freg" placeholder="EC-MLD" list="regList"></div>
+      <div class="f s2"><label for="fdp"><em>2</em>Salida</label><input id="fdp" class="t" placeholder="LEBL" maxlength="4"></div>
+      <div class="f s1"><label for="fdt">OUT (UTC)</label><input id="fdt" class="t" placeholder="06:10" inputmode="numeric"></div>
+      <div class="f s2"><label for="fap"><em>3</em>Llegada</label><input id="fap" class="t" placeholder="LEMD" maxlength="4"></div>
+      <div class="f s1"><label for="fat">IN (UTC)</label><input id="fat" class="t" placeholder="07:25" inputmode="numeric"></div>
+      <div class="f s2"><label for="ftot"><em>6</em>Total vuelo</label><input id="ftot" class="t" placeholder="1:15"></div>
+      <div class="f s2"><label for="fop"><em>5</em>Operación</label><select id="fop"><option value="mp">Multi-pilot</option><option value="me">Single pilot ME</option><option value="se">Single pilot SE</option></select></div>
+      <div class="f s2"><label for="frole"><em>10</em>Función</label><select id="frole"><option value="pic">PIC</option><option value="cop">Copiloto</option><option value="dual">Dual</option><option value="inst">Instructor</option><option value="picus">PICUS (PIC + obs.)</option></select></div>
+      <div class="f s2"><label for="fpic"><em>7</em>Nombre PIC</label><input id="fpic" placeholder="SELF"></div>
+      <div class="f s1"><label for="ftod"><em>8</em>T/O día</label><input id="ftod" type="number" min="0" max="20"></div>
+      <div class="f s1"><label for="fton">T/O noche</label><input id="fton" type="number" min="0" max="20"></div>
+      <div class="f s1"><label for="fldd">LDG día</label><input id="fldd" type="number" min="0" max="20"></div>
+      <div class="f s1"><label for="fldn">LDG noche</label><input id="fldn" type="number" min="0" max="20"></div>
+      <div class="f s2"><label for="fnight"><em>9</em>Noche</label><input id="fnight" class="t" placeholder="0:00"></div>
+      <div class="f s2"><label for="fifr"><em>9</em>IFR</label><input id="fifr" class="t" placeholder="= total"></div>
+      <div class="f s2"><label for="fcrew">Tripulación (copiloto / alumno)</label><input id="fcrew" placeholder="Apellido"></div>
+      <div class="f s6"><label for="frem"><em>12</em>Observaciones</label><input id="frem" placeholder="Line check, LOFT, PF…"></div>
+      <label class="chk s6"><input type="checkbox" id="fauto"> Calcular noche y despegues/aterrizajes de noche con la posición del sol en ruta</label>
+    </div>
+    <p class="calc" id="fnInfo"></p>
+    <p class="msg w" id="flLock" hidden></p>
+    <p class="calc" id="flCalc"></p>
+    <div class="confirm" id="flConfirm" hidden><span>¿Borrar este vuelo del libro?</span><button type="button" class="btn danger" id="flDelYes">Borrar</button><button type="button" class="btn" id="flDelNo">Cancelar</button></div>
+    <div class="row"><button type="button" class="btn danger" id="flDel" hidden>Borrar</button><button type="button" class="btn" id="flCard" hidden>Tarjeta del vuelo</button><span class="spacer"></span><button type="submit" class="btn pri">Guardar</button></div>
+  </form>
+</div>
+
+<!-- sim dialog -->
+<div class="scrim" id="simDlg" hidden>
+  <form class="dlg wide" id="simForm" autocomplete="off">
+    <div class="row"><h2 id="simTitle">Nueva sesión</h2><span class="spacer"></span><button type="button" class="btn" data-close>Cerrar</button></div>
+    <div class="tpls" id="simTpl"></div>
+    <input type="hidden" id="simPlanId">
+    <div class="fgrid">
+      <div class="f s2"><label for="sd"><em>11</em>Fecha</label><input id="sd" type="date" required></div>
+      <div class="f s2"><label for="skind">Sesión</label><select id="skind"></select></div>
+      <div class="f s2"><label for="smod">Módulo / nº</label><input id="smod" placeholder="M5 · S4 · Día 2"></div>
+      <div class="f s2"><label for="srole">Rol</label><select id="srole"><optgroup label="Instrucción"><option>TRI</option><option>SFI</option></optgroup><optgroup label="Examen"><option>TRE</option><option>SFE</option></optgroup><optgroup label="Propia"><option>Alumno PF</option><option>Alumno PM</option><option>Alumno</option><option>PF</option><option>PM</option></optgroup><option>Otro</option></select></div>
+      <div class="f s2"><label for="stot">Tiempo sesión</label><input id="stot" class="t" placeholder="4:00"></div>
+      <div class="f s1"><label for="stol">T/O + LDG</label><input id="stol" type="number" min="0" max="40" placeholder="0"></div>
+      <div class="f s1"><label for="sapp">Aprox. instr.</label><input id="sapp" type="number" min="0" max="40" placeholder="0"></div>
+      <div class="f s3"><label for="styp"><em>11</em>Tipo FSTD</label><input id="styp" placeholder="FFS A320" list="simTypList"></div>
+      <div class="f s3"><label for="sdev">Centro / dispositivo</label><input id="sdev" placeholder="CAE Barcelona · FFS 2" list="simDevList"></div>
+      <div class="f s6"><label for="sscen">Escenario y elementos</label><input id="sscen" placeholder="RTO, EFATO, GNSS app, EMER ELEC, go-around manual…"></div>
+    </div>
+    <div class="curwrap" id="scurWrap" hidden>
+      <h3>Actualizar caducidad</h3>
+      <div class="row"><select id="scurSel" aria-label="Caducidad"></select><span class="note">hasta</span><input type="date" id="scurDate" aria-label="Nueva fecha"><span class="note">OPC: fin del 6.º mes · LPC: fin del 12.º mes (revisa la fecha exacta)</span></div>
+    </div>
+    <div class="fgrid"><div class="f s6"><label for="srem"><em>12</em>Observaciones</label><input id="srem" placeholder="Remarks del libro"></div></div>
+    <label class="chk"><input type="checkbox" id="sbook"> Anotar en el libro EASA (columna 11 y totales)</label>
+    <div class="confirm" id="simConfirm" hidden><span>¿Borrar esta sesión?</span><button type="button" class="btn danger" id="simDelYes">Borrar</button><button type="button" class="btn" id="simDelNo">Cancelar</button></div>
+    <div class="row"><button type="button" class="btn danger" id="simDel" hidden>Borrar</button><span class="spacer"></span><button type="submit" class="btn pri">Guardar</button></div>
+  </form>
+</div>
+<datalist id="simDevList"></datalist>
+<!-- imprimir -->
+<div class="scrim" id="prDlg" hidden>
+  <div class="dlg">
+    <div class="row"><h2>Imprimir</h2><span class="spacer"></span><button type="button" class="btn" data-close>Cerrar</button></div>
+    <div class="f"><label for="prWhat">Qué</label><select id="prWhat"></select></div>
+    <div class="prscope" id="prScope">
+      <label class="chk" data-book><input type="radio" name="prs" value="all" checked> Libro completo</label>
+      <label class="chk" data-book><input type="radio" name="prs" value="cur"> <span>Página actual (<b id="prCurN">1</b>)</span></label>
+      <label class="chk" data-book><input type="radio" name="prs" value="pages"> Rango de páginas</label>
+      <label class="chk" data-tab hidden><input type="radio" name="prs" value="filter"> Lo que se ve ahora (búsqueda y filtros)</label>
+      <label class="chk" data-tab hidden><input type="radio" name="prs" value="alltab"> Todo</label>
+      <label class="chk"><input type="radio" name="prs" value="dates"> Rango de fechas</label>
+    </div>
+    <div class="row" id="prPages" hidden><span class="note">Desde la página</span><input type="number" id="prP1" min="1" style="width:80px"><span class="note">hasta la</span><input type="number" id="prP2" min="1" style="width:80px"></div>
+    <div class="row" id="prDates" hidden><span class="note">Desde</span><input type="date" id="prD1"><span class="note">hasta</span><input type="date" id="prD2"></div>
+    <p class="msg ok" id="prSum"></p>
+    <p class="note">Se abre el diálogo de impresión del sistema: elige tu impresora o “Guardar como PDF”, en A4 apaisado.</p>
+    <div class="row"><span class="spacer"></span><button class="btn pri" id="prGo">Imprimir</button></div>
+  </div>
+</div>
+<div id="printArea"></div>
+<!-- vuelo en directo -->
+<div class="scrim" id="liveDlg" hidden>
+  <div class="dlg live">
+    <div class="row"><h2>Vuelo en directo</h2><span class="spacer"></span><span class="mono utc" id="liveUtc"></span><button type="button" class="btn" data-close>Cerrar</button></div>
+    <div class="fgrid">
+      <div class="f s1"><label for="lvDp">Salida</label><input id="lvDp" class="t" maxlength="4" placeholder="LEBL"></div>
+      <div class="f s1"><label for="lvAp">Llegada</label><input id="lvAp" class="t" maxlength="4" placeholder="LEMD"></div>
+      <div class="f s2"><label for="lvFlt">Vuelo</label><input id="lvFlt" placeholder="VY1234"></div>
+      <div class="f s1"><label for="lvTyp">Tipo</label><input id="lvTyp" list="typList"></div>
+      <div class="f s1"><label for="lvReg">Matrícula</label><input id="lvReg" list="regList"></div>
+    </div>
+    <div class="oooi" id="oooi"></div>
+    <p class="note" id="liveInfo"></p>
+    <div class="confirm" id="lvConfirm" hidden><span>¿Descartar este vuelo en directo?</span><button class="btn danger" id="lvYes">Descartar</button><button class="btn" id="lvNo">Cancelar</button></div>
+    <div class="row"><button class="btn danger" id="lvDiscard">Descartar</button><button class="btn" id="lvUndo">Deshacer último</button><span class="spacer"></span><button class="btn pri" id="lvSave" disabled>Guardar en el libro</button></div>
+  </div>
+</div>
+
+<!-- caducidades -->
+<div class="scrim" id="curDlg" hidden>
+  <div class="dlg">
+    <div class="row"><h2>Caducidades</h2><span class="spacer"></span><button type="button" class="btn" data-close>Cerrar</button></div>
+    <p class="note">Fecha de caducidad de cada licencia, habilitación o chequeo, y con cuántos días de antelación quieres el aviso.</p>
+    <div id="curRows" class="currows"></div>
+    <div class="row"><select id="curPreset" aria-label="Añadir caducidad"></select><span class="spacer"></span><button class="btn pri" id="curSave">Guardar</button></div>
+  </div>
+</div>
+<datalist id="typList"></datalist><datalist id="regList"></datalist><datalist id="simTypList"></datalist>
+
+<script src="vendor/supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
