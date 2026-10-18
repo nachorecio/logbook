@@ -791,3 +791,48 @@ details.curg .curg-b{display:grid;gap:6px;padding:0 0 10px}
 .ck.ok i{background:var(--ok-bg);color:var(--ok);font-weight:700}
 .ck small{display:block;font-size:11px;color:var(--ink-soft)}
 .cert h3{margin-top:14px}.cert-sig{margin-top:24px;display:grid;gap:6px;justify-items:start}.cert-sig .sig-img{max-height:70px}
+
+/* 1.15 · vista móvil */
+.mlist{display:grid;grid-template-columns:minmax(0,1fr)}
+.mrow>*{min-width:0}
+.mrow{display:grid;gap:3px;padding:11px 12px;border-bottom:1px solid var(--rule);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mrow:nth-child(even){background:color-mix(in srgb,var(--band) 40%,var(--sheet))}
+.mrow:active{background:color-mix(in srgb,var(--accent) 14%,var(--sheet))}
+.mrow .m1{display:flex;align-items:baseline;gap:10px}
+.mrow .md{font:12.5px var(--f-mono);color:var(--ink-soft);flex:none;width:62px}
+.mrow .mr{font:600 15px var(--f-mono);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow .mr i{font-style:normal;color:var(--ink-soft);margin:0 5px;font-weight:400}
+.mrow .m1 b{font:700 15px var(--f-mono);font-variant-numeric:tabular-nums}
+.mrow .m2{font-size:12.5px;color:var(--ink-soft);padding-left:72px;overflow-wrap:anywhere}
+.mrow .m3{font-size:12.5px;color:var(--ink-soft);padding-left:72px;font-style:italic}
+.mfoot{position:sticky;bottom:0;background:var(--band);padding:9px 12px;font:600 12px var(--f-display);letter-spacing:.06em;text-transform:uppercase;border-top:1.5px solid var(--rule-strong)}
+@media (max-width:640px){
+  main.gut{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .tbwrap{max-height:none;overflow:visible}
+  .tbwrap:has(.mlist){border-radius:var(--r);overflow:hidden}
+  /* barra de herramientas: búsqueda a lo ancho, sin botones duplicados (el + flotante añade) */
+  .toolbar{gap:8px}
+  .toolbar h2{flex-basis:100%}
+  .toolbar input[type=search]{width:100%;flex:1 1 100%;font-size:16px}
+  .toolbar select{font-size:15px}
+  .toolbar .spacer{display:none}
+  #exportBtn,#v-fl .toolbar label[for=acarsQuick],#addFl{display:none}
+  /* portada: horas primero, mapa después */
+  .cover-r{order:0;min-height:210px}
+  .cover-r::before{background:linear-gradient(180deg,var(--cover) 0,transparent 18%)}
+  /* tablas de resumen sin desbordar */
+  .rp-t{font-size:12px}
+  .rp-t th{font-size:10px;letter-spacing:.02em;padding:5px 3px}
+  .rp-t td{padding:5px 3px}
+  .panel{padding-left:14px;padding-right:14px}
+  .lim .lab{gap:10px}.lim .lab span:last-child{white-space:nowrap}
+  /* fatiga: los 12 meses caben sin desplazar */
+  .ftg{grid-template-columns:30px repeat(12,minmax(0,1fr)) 26px;gap:2px;min-width:0;font-size:10.5px}
+  .ftg .h{font-size:8.5px;letter-spacing:0}
+  .ftg .c{padding:6px 0;border-radius:4px}
+  .ftg .c small{display:none}
+  .ftg .y,.ftg .yt{font-size:10px}
+  /* botones algo más grandes al dedo */
+  .btn{min-height:40px}
+  .seg button{padding:8px 11px}
+}

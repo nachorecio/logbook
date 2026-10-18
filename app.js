@@ -44,7 +44,7 @@ function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTim
 
 /* ---------- storage: local cache + cloud sync ---------- */
 // E: id -> {k:"f"|"s", r:record, u:updatedMs, x:deleted}
-const APP_VERSION="1.14.1";
+const APP_VERSION="1.15.0";
 let E=ls.get("lb_entries",{})||{};
 let outbox=new Set(ls.get("lb_outbox",[]));
 const live=k=>Object.values(E).filter(e=>e.k===k&&!e.x).map(e=>e.r);
@@ -117,6 +117,7 @@ async function connectCloud(){
   renderCloud();setSync();if(cloud.user)sync();
 }
 window.addEventListener("online",()=>soonSync(300));
+try{matchMedia("(max-width:640px)").addEventListener("change",()=>{try{render()}catch{}})}catch{}
 window.addEventListener("offline",setSync);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)soonSync(300)});
 setInterval(()=>{if(!document.hidden)sync()},60000);
@@ -2254,7 +2255,14 @@ $("#scSave").onclick=()=>{ls.set("lb_simcfg",{checks:[...$$("#scChecks input:che
 /* ================= VISTAS: TABLA / PÁGINA EASA E IMPRESIÓN ================= */
 let flView=ls.get("lb_flview","table"),flLimit=200,bookPage=null;
 const roleTxt=f=>f.fpic?"PIC":f.fcop?"Copiloto":f.finst?"Instructor":f.fdual?"Dual":"";
+const narrow=()=>matchMedia("(max-width:640px)").matches;
+function flCardsHTML(L,limit){
+  const rows=L.slice(0,limit),t=sum(L);
+  return `<div class="mlist">${rows.map(f=>{const ldg=(+f.ldd||0)+(+f.ldn||0);const info=[f.dt&&f.at?`${f.dt}–${f.at}`:"",f.typ,f.reg,roleTxt(f),ldg?ldg+" LDG":"",+f.night?"noche "+hm(f.night):""].filter(Boolean);
+    return `<div class="mrow" data-id="${f.id}" role="button" tabindex="0"><div class="m1"><span class="md">${fmtD(f.d)}</span><span class="mr">${esc(f.dp)}<i>→</i>${esc(f.ap)}</span><b>${hm(f.tot)}</b></div><div class="m2">${info.map(esc).join(" · ")}</div>${f.rem?`<div class="m3">${esc(f.rem)}</div>`:""}</div>`}).join("")}</div><div class="mfoot">${L.length} vuelos · ${hm0(t.tot)} h · ${t.ldd+t.ldn} LDG</div>`;
+}
 function flTableHTML(L,{click=true,limit=Infinity}={}){
+  if(click&&narrow())return flCardsHTML(L,limit);
   const rows=L.slice(0,limit),t=sum(L);
   return `<table class="tb"><thead><tr><th>Fecha</th><th>Salida</th><th>OUT</th><th>Llegada</th><th>IN</th><th>Tipo</th><th>Matrícula</th><th>Total</th><th>Función</th><th>PIC</th><th>Noche</th><th>IFR</th><th>T/O</th><th>LDG</th><th>Observaciones</th></tr></thead><tbody>
   ${rows.map(f=>`<tr${click?` class="rec" data-id="${f.id}"`:""}><td>${fmtD(f.d)}</td><td>${esc(f.dp)}</td><td>${esc(f.dt)}</td><td>${esc(f.ap)}</td><td>${esc(f.at)}</td><td class="l">${esc(f.typ)}</td><td>${esc(f.reg)}</td><td><b>${hm(f.tot)}</b></td><td>${roleTxt(f)}</td><td class="l">${esc(f.pic)}</td><td>${hm(f.night)}</td><td>${hm(f.ifr)}</td><td>${(+f.tod||0)+(+f.ton||0)||""}</td><td>${(+f.ldd||0)+(+f.ldn||0)||""}</td><td class="l rem">${esc(f.rem)}</td></tr>`).join("")}</tbody>
@@ -2291,6 +2299,8 @@ $("#bDate").addEventListener("change",e=>{const d=e.target.value;if(!d)return;co
 let simView=ls.get("lb_simview2","table"),simPage=null,simLimit=200;
 function simTableHTML(L,{click=true,limit=Infinity}={}){
   const rows=L.slice(0,limit),T=L.reduce((a,s)=>a+(+s.tot||0),0),by=g=>L.filter(s=>roleGroup(s.role)===g).reduce((a,s)=>a+(+s.tot||0),0);
+  if(click&&narrow())return `<div class="mlist">${rows.map(s=>{const info=[s.typ,s.dev,s.role,+s.tol?s.tol+" T/O-LDG":"",s.inBook===false?"fuera del libro":""].filter(Boolean);
+    return `<div class="mrow" data-sid="${s.id}" role="button" tabindex="0"><div class="m1"><span class="md">${fmtD(s.d)}</span><span class="mr">${esc([s.kind,s.mod].filter(Boolean).join(" ")||"Sesión")}</span><b>${hm(s.tot)}</b></div><div class="m2">${info.map(esc).join(" · ")}</div>${s.scen||s.rem?`<div class="m3">${esc([s.scen,s.rem].filter(Boolean).join(" · "))}</div>`:""}</div>`}).join("")}</div><div class="mfoot">${L.length} sesiones · ${hm0(T)} h · instructor ${hm0(by("ins"))} · examinador ${hm0(by("exa"))}</div>`;
   return `<table class="tb"><thead><tr><th>Fecha</th><th>Tipo FSTD</th><th>Centro / dispositivo</th><th>Sesión</th><th>Rol</th><th>Tiempo</th><th>T/O-LDG</th><th>Aprox.</th><th>Col. 11</th><th>Escenario y observaciones</th></tr></thead><tbody>
   ${rows.map(s=>`<tr${click?` class="rec" data-sid="${s.id}"`:""}><td>${fmtD(s.d)}</td><td class="l">${esc(s.typ)}</td><td class="l">${esc(s.dev||"")}</td><td class="l">${esc([s.kind,s.mod].filter(Boolean).join(" "))}</td><td>${esc(s.role)}</td><td><b>${hm(s.tot)}</b></td><td>${+s.tol||""}</td><td>${+s.app||""}</td><td>${s.inBook===false?"No":"Sí"}</td><td class="l rem">${esc([s.scen,s.rem].filter(Boolean).join(" · "))}</td></tr>`).join("")}</tbody>
   <tfoot><tr><td colspan="5" class="lab">${L.length} sesiones · instructor ${hm0(by("ins"))} · examinador ${hm0(by("exa"))} · propias ${hm0(by("own")+by("oth"))}</td><td>${hm0(T)}</td><td colspan="4"></td></tr></tfoot></table>`;

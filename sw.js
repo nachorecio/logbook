@@ -1,5 +1,5 @@
 // Pilot Logbook service worker: app shell offline + font cache.
-const VERSION = "lb-1.14.1";
+const VERSION = "lb-1.15.0";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "vendor/supabase.js", "vendor/591.supabase.js",
