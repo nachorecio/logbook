@@ -836,3 +836,4 @@ details.curg .curg-b{display:grid;gap:6px;padding:0 0 10px}
   .btn{min-height:40px}
   .seg button{padding:8px 11px}
 }
+.skins[hidden]{display:none}
