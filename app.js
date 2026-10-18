@@ -44,7 +44,7 @@ function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTim
 
 /* ---------- storage: local cache + cloud sync ---------- */
 // E: id -> {k:"f"|"s", r:record, u:updatedMs, x:deleted}
-const APP_VERSION="1.15.2";
+const APP_VERSION="1.15.3";
 let E=ls.get("lb_entries",{})||{};
 let outbox=new Set(ls.get("lb_outbox",[]));
 /* ajustes personales que viajan con la nube (nombre, licencia, configuración): registro x/cfg */
@@ -2053,6 +2053,14 @@ const sigPng=()=>live("x").find(r=>r.id==="sig")?.png||"";
     // normaliza a tinta oscura para imprimir
     const c2=document.createElement("canvas");c2.width=cv.width;c2.height=cv.height;const x2=c2.getContext("2d");x2.drawImage(cv,0,0);x2.globalCompositeOperation="source-in";x2.fillStyle="#14213A";x2.fillRect(0,0,c2.width,c2.height);
     putRec("x",{id:"sig",d:"",png:c2.toDataURL("image/png")});toast("Firma guardada");renderSig()};
+  $("#sigFile").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;
+    try{const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=URL.createObjectURL(f)});
+      const k=Math.min(1,900/img.width),c=document.createElement("canvas");c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);
+      const x=c.getContext("2d");x.drawImage(img,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),p=d.data;
+      // el papel blanco se vuelve transparente para que no tape las líneas de la página
+      for(let i=0;i<p.length;i+=4){const l=(p[i]+p[i+1]+p[i+2])/3;if(l>=235)p[i+3]=0;else if(l>200)p[i+3]=Math.round(p[i+3]*(235-l)/35)}
+      x.putImageData(d,0,0);putRec("x",{id:"sig",d:"",png:c.toDataURL("image/png")});toast("Firma guardada");renderSig()}
+    catch{toast("No pude leer la imagen")}};
   $("#sigDel").onclick=()=>{removeRec("x","sig");ctx.clearRect(0,0,cv.width,cv.height);dirty=false;renderSig()};
 })();
 function renderSig(){const s=sigPng(),el=$("#sigCur");if(!el)return;el.innerHTML=s?`<img src="${s}" alt="Firma guardada" class="sig-img"><span class="note">Firma guardada: se imprime en los informes y en las páginas cerradas.</span>`:`<span class="note">Sin firma guardada.</span>`}
