@@ -511,7 +511,7 @@ textarea#rosPaste{width:100%;padding:8px 10px;border:1px solid var(--rule-strong
 /* ===== firma y cierre ===== */
 .sigpad{width:100%;max-width:600px;height:auto;aspect-ratio:3/1;border:1px dashed var(--rule-strong);border-radius:var(--r);background:var(--sheet);touch-action:none;cursor:crosshair;display:block}
 .sig-img{height:90px;width:auto;max-width:240px;object-fit:contain;display:block;margin:4px 0}
-table.easa td.cert .sig-img{height:34px;margin:2px auto}
+table.easa td.cert .sig-img{height:56px;max-width:none;margin:2px auto}
 .rp-sign .sig-img{height:80px;display:inline-block;vertical-align:middle;margin:6px 0 2px}
 .lockbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;padding:6px 12px;background:var(--band);color:var(--ink);border:1px solid var(--rule);border-top:0;border-radius:0 0 4px 4px}
 .lockbar.ok{background:var(--ok-bg)}.lockbar.bad{background:var(--bad-bg)}

@@ -44,7 +44,7 @@ function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTim
 
 /* ---------- storage: local cache + cloud sync ---------- */
 // E: id -> {k:"f"|"s", r:record, u:updatedMs, x:deleted}
-const APP_VERSION="1.15.3";
+const APP_VERSION="1.15.4";
 let E=ls.get("lb_entries",{})||{};
 let outbox=new Set(ls.get("lb_outbox",[]));
 /* ajustes personales que viajan con la nube (nombre, licencia, configuración): registro x/cfg */
@@ -2080,7 +2080,8 @@ function lockBar(n,pg,o){
   if(lk){const ok=lk.hash===h;return `<div class="lockbar ${ok?"ok":"bad"}"><span>${ok?"🔒":"⚠"} Página ${n} cerrada el ${fmtD(lk.at)} · huella <span class="mono">${lk.hash}</span>${ok?"":" · <b>el contenido ha cambiado desde el cierre</b> (se ha editado o insertado una entrada anterior)"}</span><span class="spacer"></span><button class="btn sm" data-unlock="${n}">Reabrir</button></div>`}
   return `<div class="lockbar"><span>Página ${n} · ${pg.length}/${EASA_ROWS} entradas${full?"":" · se cierra cuando esté completa"}</span><span class="spacer"></span><button class="btn sm pri" data-lock="${n}"${full?"":" disabled"}>Cerrar y firmar página</button></div>`;
 }
-$("#repOut").addEventListener("click",async e=>{
+document.addEventListener("click",async e=>{
+  if(!e.target.closest("#repOut,#flPage,#simPageWrap,#v-sim"))return;
   const l=e.target.closest("[data-lock]"),u=e.target.closest("[data-unlock]");
   if(l){const n=+l.dataset.lock,pg=easaPages()[n-1];if(!pg)return;if(!sigPng()&&!confirmNoSig){toast("Sin firma guardada: se cierra con la huella. Puedes dibujar tu firma en Ajustes.");confirmNoSig=true}
     putRec("g",{id:"pg"+n,d:"",page:n,at:today(),hash:await sha(pageCanon(pg)),n:pg.length});toast(`Página ${n} cerrada`)}
