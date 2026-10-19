@@ -44,7 +44,7 @@ function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTim
 
 /* ---------- storage: local cache + cloud sync ---------- */
 // E: id -> {k:"f"|"s", r:record, u:updatedMs, x:deleted}
-const APP_VERSION="1.16.0";
+const APP_VERSION="1.16.1";
 let E={};
 let outbox=new Set();
 /* almacenamiento local: IndexedDB (cientos de MB) con respaldo en localStorage (5 MB) */
@@ -1425,7 +1425,10 @@ async function satParsePDF(pdf){
       const B=W.filter(w=>w.top>=lo&&w.top<hi),col=(a,b)=>B.filter(w=>w.x>=a&&w.x<b).sort((p,q)=>Math.round(p.top)-Math.round(q.top)||p.x-q.x).map(w=>w.t).join(" ");
       rows.push({date:col(0,40),off:col(75,130),on:col(130,155),typ:col(155,205),reg:col(205,252),syn:col(598,640),isyn:col(640,680),rem:col(750,900)})});
   }
-  const ok=rows.filter(r=>/(\d\d)-\s*(\d\d)-\s*(\d{4})/.test(r.date)&&/\d:\d\d/.test(r.off)&&/\d:\d\d/.test(r.on));
+  // las clases teóricas (Technical Training, ground school…) no son sesiones de simulador: no cuentan
+  const THEORY=/technical training|ground (school|training)|te[oó]ric|theor(y|etical)|\bCBT\b|classroom|\baula\b/i;
+  const ok0=rows.filter(r=>/(\d\d)-\s*(\d\d)-\s*(\d{4})/.test(r.date)&&/\d:\d\d/.test(r.off)&&/\d:\d\d/.test(r.on));
+  const ok=ok0.filter(r=>!THEORY.test(r.rem)),theory=ok0.length-ok.length;
   // franja exacta → una sesión (tope = calzos); franjas solapadas el mismo día → una sesión (tope = unión)
   const g=new Map();ok.forEach(r=>{const [,dd,mm,yy]=r.date.match(/(\d\d)-\s*(\d\d)-\s*(\d{4})/),d=`${yy}-${mm}-${dd}`,k=d+"|"+r.off+"|"+r.on;if(!g.has(k))g.set(k,{d,off:r.off,on:r.on,rows:[]});g.get(k).rows.push(r)});
   const slots=[...g.values()].map(s=>{const a=hm2m(s.off);let b=hm2m(s.on);if(b<=a)b+=1440;const raw=s.rows.reduce((x,r)=>x+hm2m(r.isyn||r.syn),0);return {...s,a,b,raw,t:Math.min(raw,b-a)}});
@@ -1438,13 +1441,13 @@ async function satParsePDF(pdf){
       if(raw>t)merged.push({d:c[0].d,raw,t,n:rs.length});
       const rem=[...new Set(rs.map(r=>r.rem))].join(" / "),dev=rs[0].reg.replace(/\s+/g," ").trim();
       S.push({id:uid(),d:c[0].d,typ:simTypOf(rs[0].typ+" "+dev),dev:dev+" · Simple Aviation Training",kind:simKindOf(rem),mod:"",tot:t,role:isTreText(rem)?"TRE":"TRI",tol:0,app:0,rem,scen:"",inBook:false,ext:"sat:"+c[0].d+" "+c[0].off})})});
-  return {S:S.sort((a,b)=>a.d.localeCompare(b.d)),merged,rows:ok.length,total};
+  return {S:S.sort((a,b)=>a.d.localeCompare(b.d)),merged,rows:ok.length,total,theory};
 }
 async function satImport(pdf,file){
   const r=await satParsePDF(pdf);
   imp={file:file.name,kind:"sat",parsed:{F:[],S:r.S}};
   drawPreview();
-  area.insertAdjacentHTML("afterbegin",`<div class="msg ok">Informe de Simple Aviation Training: ${r.rows} líneas (${hm0(r.total)} h) → ${r.S.length} sesiones (${hm0(r.S.reduce((a,s)=>a+s.tot,0))} h). ${r.merged.length?`He juntado alumnos de la misma sesión o franjas solapadas en ${r.merged.length} días (${r.merged.slice(0,6).map(m=>fmtD(m.d)).join(", ")}${r.merged.length>6?"…":""}).`:""} Las LPC, revalidaciones, renovaciones y skill tests van como TRE. Las sesiones que ya tienes no se duplican.</div>`);
+  area.insertAdjacentHTML("afterbegin",`<div class="msg ok">Informe de Simple Aviation Training: ${r.rows} líneas (${hm0(r.total)} h) → ${r.S.length} sesiones (${hm0(r.S.reduce((a,s)=>a+s.tot,0))} h). ${r.merged.length?`He juntado alumnos de la misma sesión o franjas solapadas en ${r.merged.length} días (${r.merged.slice(0,6).map(m=>fmtD(m.d)).join(", ")}${r.merged.length>6?"…":""}).`:""} ${r.theory?`He dejado fuera ${r.theory} clases teóricas (Technical Training), que no son simulador. `:""}Las LPC, revalidaciones, renovaciones y skill tests van como TRE. Las sesiones que ya tienes no se duplican.</div>`);
 }
 /* Pitulin · Exámenes: pegar el texto del archivo */
 const MES_ES={ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,sept:9,oct:10,nov:11,dic:12};
